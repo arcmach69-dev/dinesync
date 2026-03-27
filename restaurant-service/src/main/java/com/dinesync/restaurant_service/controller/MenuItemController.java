@@ -17,7 +17,6 @@ import com.dinesync.restaurant_service.service.MenuItemService;
 
 @RestController
 @RequestMapping("/api/menu-items")
-@CrossOrigin(origins = "*")
 public class MenuItemController {
 
     @Autowired
