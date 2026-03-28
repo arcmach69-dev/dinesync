@@ -22,11 +22,12 @@ const Login = () => {
       });
       login(response.data);
       const role = response.data.role;
-      if (role === 'ADMIN') navigate('/admin');
-      else if (role === 'MANAGER') navigate('/admin');
-      else if (role === 'WAITER') navigate('/waiter');
-      else if (role === 'KITCHEN_STAFF') navigate('/kitchen');
-      else navigate('/admin');
+     if (role === 'ADMIN') navigate('/admin');
+else if (role === 'MANAGER') navigate('/manager');
+else if (role === 'WAITER') navigate('/waiter');
+else if (role === 'KITCHEN_STAFF') navigate('/kitchen');
+else if (role === 'CUSTOMER') navigate('/customer');
+else navigate('/admin');
     } catch (err) {
       setError('Invalid email or password');
     } finally {

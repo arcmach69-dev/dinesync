@@ -2,11 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaTrash } from 'react-icons/fa';
 
 const OrderManagement = () => {
   const [orders, setOrders] = useState([]);
-  const [menuItems, setMenuItems] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     customerId: 1, tableId: '', waiterId: '',
@@ -17,7 +16,6 @@ const OrderManagement = () => {
 
   useEffect(() => {
     fetchOrders();
-    fetchMenuItems();
   }, []);
 
   const fetchOrders = async () => {
@@ -27,20 +25,15 @@ const OrderManagement = () => {
     } catch (err) { console.error(err); }
   };
 
-  const fetchMenuItems = async () => {
-    try {
-      const res = await api.get('/api/menu-items');
-      setMenuItems(res.data);
-    } catch (err) { console.error(err); }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       await api.post('/api/orders', form);
       setShowForm(false);
-      setForm({ customerId: 1, tableId: '', waiterId: '',
-        orderType: 'DINE_IN', orderStatus: 'RECEIVED', totalAmount: 0 });
+      setForm({
+        customerId: 1, tableId: '', waiterId: '',
+        orderType: 'DINE_IN', orderStatus: 'RECEIVED', totalAmount: 0,
+      });
       fetchOrders();
     } catch (err) { console.error(err); }
   };
@@ -78,9 +71,11 @@ const OrderManagement = () => {
           <span style={styles.logoText}>DineSync</span>
         </div>
         <div style={styles.backBtn} onClick={() => navigate('/admin')}>
-          <FaArrowLeft /> <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
+          <FaArrowLeft />
+          <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
-        <div style={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
+        <div style={styles.logoutBtn}
+          onClick={() => { logout(); navigate('/login'); }}>
           🚪 Logout
         </div>
       </div>
@@ -104,30 +99,37 @@ const OrderManagement = () => {
                 <div style={styles.formGrid}>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Customer ID</label>
-                    <input style={styles.input} type="number" value={form.customerId}
-                      onChange={e => setForm({...form, customerId: e.target.value})} required />
+                    <input style={styles.input} type="number"
+                      value={form.customerId}
+                      onChange={e => setForm({...form, customerId: e.target.value})}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Table ID (optional)</label>
-                    <input style={styles.input} type="number" value={form.tableId}
+                    <input style={styles.input} type="number"
+                      value={form.tableId}
                       onChange={e => setForm({...form, tableId: e.target.value})} />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Waiter ID (optional)</label>
-                    <input style={styles.input} type="number" value={form.waiterId}
+                    <input style={styles.input} type="number"
+                      value={form.waiterId}
                       onChange={e => setForm({...form, waiterId: e.target.value})} />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Order Type</label>
                     <select style={styles.input} value={form.orderType}
                       onChange={e => setForm({...form, orderType: e.target.value})}>
-                      {['DINE_IN','TAKEAWAY','ONLINE'].map(t => <option key={t}>{t}</option>)}
+                      {['DINE_IN','TAKEAWAY','ONLINE'].map(t =>
+                        <option key={t}>{t}</option>)}
                     </select>
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Total Amount</label>
-                    <input style={styles.input} type="number" step="0.01" value={form.totalAmount}
-                      onChange={e => setForm({...form, totalAmount: e.target.value})} required />
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.totalAmount}
+                      onChange={e => setForm({...form, totalAmount: e.target.value})}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Status</label>
@@ -141,7 +143,9 @@ const OrderManagement = () => {
                 <div style={styles.modalBtns}>
                   <button type="button" style={styles.cancelBtn}
                     onClick={() => setShowForm(false)}>Cancel</button>
-                  <button type="submit" style={styles.saveBtn}>Create Order</button>
+                  <button type="submit" style={styles.saveBtn}>
+                    Create Order
+                  </button>
                 </div>
               </form>
             </div>
@@ -164,16 +168,26 @@ const OrderManagement = () => {
             <tbody>
               {orders.map(order => (
                 <tr key={order.orderId} style={styles.tableRow}>
-                  <td style={styles.td}><strong>#{order.orderId}</strong></td>
+                  <td style={styles.td}>
+                    <strong>#{order.orderId}</strong>
+                  </td>
                   <td style={styles.td}>Customer {order.customerId}</td>
                   <td style={styles.td}>
-                    <span style={{...styles.badge, background: orderTypeColors[order.orderType]}}>
+                    <span style={{
+                      ...styles.badge,
+                      background: orderTypeColors[order.orderType]
+                    }}>
                       {order.orderType}
                     </span>
                   </td>
-                  <td style={styles.td}><strong>${order.totalAmount}</strong></td>
                   <td style={styles.td}>
-                    <span style={{...styles.badge, background: statusColors[order.orderStatus]}}>
+                    <strong>${order.totalAmount}</strong>
+                  </td>
+                  <td style={styles.td}>
+                    <span style={{
+                      ...styles.badge,
+                      background: statusColors[order.orderStatus]
+                    }}>
                       {order.orderStatus}
                     </span>
                   </td>
@@ -181,14 +195,24 @@ const OrderManagement = () => {
                     <select
                       style={styles.statusSelect}
                       value={order.orderStatus}
-                      onChange={e => handleStatusUpdate(order, e.target.value)}
-                    >
-                      {['RECEIVED','PREPARING','READY','DELIVERED','CANCELLED'].map(s =>
+                      onChange={e =>
+                        handleStatusUpdate(order, e.target.value)}>
+                      {['RECEIVED','PREPARING','READY',
+                        'DELIVERED','CANCELLED'].map(s =>
                         <option key={s}>{s}</option>)}
                     </select>
                   </td>
                   <td style={styles.td}>
-                    <button style={styles.deleteBtn} onClick={() => handleDelete(order.orderId)}>
+                    {order.orderStatus === 'DELIVERED' && (
+                      <button
+                        style={styles.invoiceBtn}
+                        onClick={() =>
+                          navigate(`/invoice/${order.orderId}`)}>
+                        🧾 Bill
+                      </button>
+                    )}
+                    <button style={styles.deleteBtn}
+                      onClick={() => handleDelete(order.orderId)}>
                       <FaTrash />
                     </button>
                   </td>
@@ -196,7 +220,10 @@ const OrderManagement = () => {
               ))}
               {orders.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{...styles.td, textAlign:'center', color:'#888', padding:'40px'}}>
+                  <td colSpan="7" style={{
+                    ...styles.td, textAlign:'center',
+                    color:'#888', padding:'40px'
+                  }}>
                     No orders yet. Create your first order!
                   </td>
                 </tr>
@@ -253,8 +280,8 @@ const styles = {
   formGroup: { display: 'flex', flexDirection: 'column' },
   label: { fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px' },
   input: {
-    padding: '10px 12px', border: '2px solid #e0e0e0', borderRadius: '8px',
-    fontSize: '14px', outline: 'none',
+    padding: '10px 12px', border: '2px solid #e0e0e0',
+    borderRadius: '8px', fontSize: '14px', outline: 'none',
   },
   modalBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' },
   cancelBtn: {
@@ -271,13 +298,24 @@ const styles = {
   },
   table: { width: '100%', borderCollapse: 'collapse' },
   tableHead: { background: '#f8f9fa' },
-  th: { padding: '15px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#555' },
+  th: {
+    padding: '15px 20px', textAlign: 'left',
+    fontSize: '13px', fontWeight: '600', color: '#555',
+  },
   tableRow: { borderTop: '1px solid #f0f0f0' },
   td: { padding: '15px 20px', fontSize: '14px', color: '#333' },
-  badge: { padding: '4px 10px', borderRadius: '20px', color: 'white', fontSize: '12px', fontWeight: '600' },
+  badge: {
+    padding: '4px 10px', borderRadius: '20px',
+    color: 'white', fontSize: '12px', fontWeight: '600',
+  },
   statusSelect: {
-    padding: '6px 10px', border: '2px solid #e0e0e0', borderRadius: '6px',
-    fontSize: '13px', cursor: 'pointer', outline: 'none',
+    padding: '6px 10px', border: '2px solid #e0e0e0',
+    borderRadius: '6px', fontSize: '13px', cursor: 'pointer', outline: 'none',
+  },
+  invoiceBtn: {
+    background: '#2ecc71', color: 'white', border: 'none',
+    padding: '7px 10px', borderRadius: '6px', cursor: 'pointer',
+    marginRight: '5px', fontSize: '13px',
   },
   deleteBtn: {
     background: '#e74c3c', color: 'white', border: 'none',
