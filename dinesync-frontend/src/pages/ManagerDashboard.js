@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBlockBackNav } from '../context/useBlockBackNav';
 import api from '../services/api';
 import { FaUtensils, FaClipboardList, FaChair, FaBoxes,
   FaSignOutAlt, FaTachometerAlt, FaChartLine, FaUsers } from 'react-icons/fa';
 
 const ManagerDashboard = () => {
+  useBlockBackNav(); 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuCount, setMenuCount] = useState(0);

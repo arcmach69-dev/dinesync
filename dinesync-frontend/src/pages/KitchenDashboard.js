@@ -1,28 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBlockBackNav } from '../context/useBlockBackNav';
 import api from '../services/api';
 
 const KitchenDashboard = () => {
   const [orders, setOrders] = useState([]);
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  useBlockBackNav();
 
   useEffect(() => {
     fetchOrders();
-    // Auto refresh every 30 seconds
-    const interval = setInterval(fetchOrders, 30000);
+    const interval = setInterval(fetchOrders, 5000);
     return () => clearInterval(interval);
   }, []);
 
   const fetchOrders = async () => {
     try {
       const res = await api.get('/api/orders');
-      // Show only active orders
-      const active = res.data.filter(o =>
-        o.orderStatus !== 'DELIVERED' && o.orderStatus !== 'CANCELLED'
-      );
-      setOrders(active);
+      setOrders(res.data.filter(o =>
+        o.orderStatus !== 'DELIVERED' &&
+        o.orderStatus !== 'CANCELLED'
+      ));
     } catch (err) { console.error(err); }
   };
 
@@ -36,113 +36,101 @@ const KitchenDashboard = () => {
   };
 
   const statusColors = {
-    RECEIVED: '#3498db',
-    PREPARING: '#f5a623',
-    READY: '#2ecc71',
+    RECEIVED: '#3498db', PREPARING: '#f5a623', READY: '#2ecc71',
+  };
+
+  const statusEmoji = {
+    RECEIVED: '📋', PREPARING: '👨‍🍳', READY: '✅',
   };
 
   const nextStatus = {
-    RECEIVED: 'PREPARING',
-    PREPARING: 'READY',
-    READY: 'DELIVERED',
+    RECEIVED: 'PREPARING', PREPARING: 'READY',
   };
 
-  const nextStatusLabel = {
-    RECEIVED: '🔥 Start Preparing',
+  const nextLabel = {
+    RECEIVED: '👨‍🍳 Start Preparing',
     PREPARING: '✅ Mark Ready',
-    READY: '🚀 Mark Delivered',
   };
 
   return (
     <div style={styles.container}>
-      {/* Sidebar */}
-      <div style={styles.sidebar}>
-        <div style={styles.logo}>
-          <span>🍽️</span>
-          <span style={styles.logoText}>DineSync</span>
-        </div>
-        <div style={styles.menuItem}>
-          👨‍🍳 Kitchen Dashboard
-        </div>
-        <div style={styles.refreshBtn} onClick={fetchOrders}>
-          🔄 Refresh Orders
-        </div>
-        <div style={styles.logoutBtn}
-          onClick={() => { logout(); navigate('/login'); }}>
-          🚪 Logout
+      <div style={styles.topBar}>
+        <div style={styles.brand}>🍽️ DineSync — Kitchen</div>
+        <div style={styles.topRight}>
+          <span style={styles.autoRefresh}>🔄 Auto-refresh 5s</span>
+          <span style={styles.userEmail}>{user?.email}</span>
+          <button style={styles.logoutBtn}
+            onClick={() => { logout(); navigate('/login', { replace: true }); }}>
+            Logout
+          </button>
         </div>
       </div>
 
-      {/* Main */}
       <div style={styles.main}>
-        <div style={styles.header}>
-          <div>
-            <h1 style={styles.title}>👨‍🍳 Kitchen Dashboard</h1>
-            <p style={styles.subtitle}>
-              {orders.length} active orders • Auto-refreshes every 30s
-            </p>
-          </div>
-          <div style={styles.roleBadge}>KITCHEN</div>
-        </div>
-
-        {/* Status Summary */}
-        <div style={styles.summaryGrid}>
-          {['RECEIVED', 'PREPARING', 'READY'].map(status => (
-            <div key={status} style={{...styles.summaryCard,
-              borderTop: `4px solid ${statusColors[status]}`}}>
-              <div style={{...styles.summaryCount,
-                color: statusColors[status]}}>
+        <div style={styles.pageHeader}>
+          <h1 style={styles.title}>Kitchen Order Queue</h1>
+          <div style={styles.stats}>
+            {['RECEIVED','PREPARING','READY'].map(status => (
+              <div key={status} style={{
+                ...styles.statBadge,
+                background: statusColors[status]
+              }}>
+                {statusEmoji[status]} {status}:{' '}
                 {orders.filter(o => o.orderStatus === status).length}
               </div>
-              <div style={styles.summaryLabel}>{status}</div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        {/* Orders Grid */}
         {orders.length === 0 ? (
-          <div style={styles.emptyState}>
-            <div style={styles.emptyIcon}>✅</div>
-            <h2>All caught up!</h2>
-            <p>No active orders at the moment.</p>
+          <div style={styles.empty}>
+            <div style={{fontSize:'64px'}}>🍽️</div>
+            <h2>No active orders</h2>
+            <p>New orders will appear here automatically</p>
           </div>
         ) : (
           <div style={styles.ordersGrid}>
             {orders.map(order => (
               <div key={order.orderId} style={{
                 ...styles.orderCard,
-                borderTop: `5px solid ${statusColors[order.orderStatus] || '#888'}`
+                borderTop: `5px solid ${statusColors[order.orderStatus]}`
               }}>
                 <div style={styles.orderHeader}>
-                  <span style={styles.orderId}>Order #{order.orderId}</span>
+                  <span style={styles.orderId}>
+                    Order #{order.orderId}
+                  </span>
                   <span style={{
                     ...styles.statusBadge,
-                    background: statusColors[order.orderStatus] || '#888'
+                    background: statusColors[order.orderStatus]
                   }}>
-                    {order.orderStatus}
+                    {statusEmoji[order.orderStatus]} {order.orderStatus}
                   </span>
                 </div>
-                <div style={styles.orderDetails}>
-                  <div style={styles.orderDetail}>
-                    👤 Customer {order.customerId}
+                <div style={styles.orderMeta}>
+                  🛒 {order.orderType}
+                </div>
+                {order.customerName && (
+                  <div style={styles.customerInfo}>
+                    👤 {order.customerName}
+                    {order.customerPhone &&
+                      ` • 📞 ${order.customerPhone}`}
                   </div>
-                  <div style={styles.orderDetail}>
-                    🪑 {order.orderType}
-                  </div>
-                  <div style={styles.orderDetail}>
-                    💰 ${order.totalAmount}
-                  </div>
+                )}
+                <div style={styles.orderAmount}>
+                  💰 ${order.totalAmount}
                 </div>
                 {nextStatus[order.orderStatus] && (
                   <button
                     style={{
                       ...styles.actionBtn,
-                      background: statusColors[nextStatus[order.orderStatus]]
+                      background: statusColors[
+                        nextStatus[order.orderStatus]
+                      ]
                     }}
-                    onClick={() => updateStatus(order,
-                      nextStatus[order.orderStatus])}
-                  >
-                    {nextStatusLabel[order.orderStatus]}
+                    onClick={() => updateStatus(
+                      order, nextStatus[order.orderStatus]
+                    )}>
+                    {nextLabel[order.orderStatus]}
                   </button>
                 )}
               </div>
@@ -155,75 +143,68 @@ const KitchenDashboard = () => {
 };
 
 const styles = {
-  container: { display: 'flex', height: '100vh', fontFamily: "'Segoe UI', sans-serif" },
-  sidebar: {
-    width: '250px', background: '#1a1a2e', color: 'white',
-    display: 'flex', flexDirection: 'column', padding: '20px 0',
+  container: {
+    display: 'flex', flexDirection: 'column',
+    height: '100vh', fontFamily: "'Segoe UI', sans-serif",
+    background: '#f0f2f5',
   },
-  logo: { display: 'flex', alignItems: 'center', padding: '0 20px 30px', gap: '10px' },
-  logoText: { fontSize: '22px', fontWeight: '800', color: '#f5a623' },
-  menuItem: {
-    padding: '12px 20px', color: 'white',
-    background: 'rgba(245,166,35,0.15)',
-    borderLeft: '3px solid #f5a623', fontSize: '14px',
+  topBar: {
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    background: '#1a1a2e', padding: '0 30px', height: '60px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
   },
-  refreshBtn: {
-    padding: '12px 20px', cursor: 'pointer',
-    color: '#aaa', fontSize: '14px', marginTop: '10px',
-  },
+  brand: { color: '#f5a623', fontWeight: '800', fontSize: '20px' },
+  topRight: { display: 'flex', alignItems: 'center', gap: '20px' },
+  autoRefresh: { color: '#2ecc71', fontSize: '13px', fontWeight: '600' },
+  userEmail: { color: '#aaa', fontSize: '13px' },
   logoutBtn: {
-    marginTop: 'auto', padding: '15px 20px', cursor: 'pointer',
-    color: '#e74c3c', borderTop: '1px solid #2d2d44', fontSize: '14px',
+    background: '#e74c3c', color: 'white', border: 'none',
+    padding: '8px 16px', borderRadius: '6px', cursor: 'pointer',
+    fontWeight: '600', fontSize: '13px',
   },
-  main: { flex: 1, background: '#f0f2f5', overflow: 'auto', padding: '30px' },
-  header: {
+  main: { flex: 1, overflow: 'auto', padding: '30px' },
+  pageHeader: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     background: 'white', padding: '20px 30px', borderRadius: '12px',
     marginBottom: '25px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
-  title: { fontSize: '24px', fontWeight: '700', color: '#1a1a2e', margin: 0 },
-  subtitle: { color: '#888', margin: '4px 0 0', fontSize: '14px' },
-  roleBadge: {
-    background: '#f5a623', color: 'white', padding: '6px 16px',
-    borderRadius: '20px', fontWeight: '600', fontSize: '13px',
+  title: { fontSize: '22px', fontWeight: '700', color: '#1a1a2e', margin: 0 },
+  stats: { display: 'flex', gap: '10px' },
+  statBadge: {
+    padding: '6px 14px', color: 'white',
+    borderRadius: '20px', fontSize: '13px', fontWeight: '600',
   },
-  summaryGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
-    gap: '20px', marginBottom: '25px',
+  empty: {
+    textAlign: 'center', padding: '80px',
+    background: 'white', borderRadius: '12px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
-  summaryCard: {
-    background: 'white', borderRadius: '12px', padding: '20px',
-    textAlign: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-  },
-  summaryCount: { fontSize: '48px', fontWeight: '800' },
-  summaryLabel: { fontSize: '14px', color: '#888', fontWeight: '600', marginTop: '5px' },
-  emptyState: {
-    textAlign: 'center', padding: '80px', background: 'white',
-    borderRadius: '12px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-  },
-  emptyIcon: { fontSize: '64px', marginBottom: '20px' },
   ordersGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px',
+    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px',
   },
   orderCard: {
     background: 'white', borderRadius: '12px', padding: '20px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+    boxShadow: '0 4px 15px rgba(0,0,0,0.08)',
   },
   orderHeader: {
     display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center', marginBottom: '15px',
+    alignItems: 'center', marginBottom: '12px',
   },
-  orderId: { fontSize: '18px', fontWeight: '700', color: '#1a1a2e' },
+  orderId: { fontSize: '18px', fontWeight: '800', color: '#1a1a2e' },
   statusBadge: {
-    padding: '4px 12px', borderRadius: '20px',
-    color: 'white', fontSize: '12px', fontWeight: '600',
+    padding: '4px 10px', borderRadius: '20px',
+    color: 'white', fontSize: '11px', fontWeight: '600',
   },
-  orderDetails: { marginBottom: '15px' },
-  orderDetail: { fontSize: '14px', color: '#555', padding: '4px 0' },
+  orderMeta: { fontSize: '13px', color: '#888', marginBottom: '5px' },
+  customerInfo: {
+    fontSize: '13px', color: '#3498db',
+    fontWeight: '600', marginBottom: '5px',
+  },
+  orderAmount: { fontSize: '16px', fontWeight: '700', color: '#1a1a2e', marginBottom: '15px' },
   actionBtn: {
     width: '100%', padding: '12px', color: 'white', border: 'none',
-    borderRadius: '8px', fontSize: '14px', fontWeight: '600',
-    cursor: 'pointer',
+    borderRadius: '8px', cursor: 'pointer',
+    fontWeight: '700', fontSize: '14px',
   },
 };
 

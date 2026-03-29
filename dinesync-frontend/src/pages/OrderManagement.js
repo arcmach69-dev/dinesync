@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import api from '../services/api';
 import { FaArrowLeft, FaPlus, FaTrash } from 'react-icons/fa';
 
@@ -9,14 +10,14 @@ const OrderManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({
     customerId: 1, tableId: '', waiterId: '',
-    orderType: 'DINE_IN', orderStatus: 'RECEIVED', totalAmount: 0,
+    orderType: 'DINE_IN', orderStatus: 'RECEIVED',
+    totalAmount: 0, customerName: '', customerPhone: '',
   });
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { goToDashboard } = useRoleNavigation();
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useEffect(() => { fetchOrders(); }, []);
 
   const fetchOrders = async () => {
     try {
@@ -32,7 +33,8 @@ const OrderManagement = () => {
       setShowForm(false);
       setForm({
         customerId: 1, tableId: '', waiterId: '',
-        orderType: 'DINE_IN', orderStatus: 'RECEIVED', totalAmount: 0,
+        orderType: 'DINE_IN', orderStatus: 'RECEIVED',
+        totalAmount: 0, customerName: '', customerPhone: '',
       });
       fetchOrders();
     } catch (err) { console.error(err); }
@@ -70,12 +72,12 @@ const OrderManagement = () => {
           <span>🍽️</span>
           <span style={styles.logoText}>DineSync</span>
         </div>
-        <div style={styles.backBtn} onClick={() => navigate('/admin')}>
+        <div style={styles.backBtn} onClick={() => goToDashboard()}>
           <FaArrowLeft />
           <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
         <div style={styles.logoutBtn}
-          onClick={() => { logout(); navigate('/login'); }}>
+          onClick={() => { logout(); navigate('/login', { replace: true }); }}>
           🚪 Logout
         </div>
       </div>
@@ -98,6 +100,20 @@ const OrderManagement = () => {
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGrid}>
                   <div style={styles.formGroup}>
+                    <label style={styles.label}>Customer Name</label>
+                    <input style={styles.input}
+                      placeholder="Optional"
+                      value={form.customerName}
+                      onChange={e => setForm({...form, customerName: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Phone Number</label>
+                    <input style={styles.input}
+                      placeholder="Optional"
+                      value={form.customerPhone}
+                      onChange={e => setForm({...form, customerPhone: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
                     <label style={styles.label}>Customer ID</label>
                     <input style={styles.input} type="number"
                       value={form.customerId}
@@ -109,12 +125,6 @@ const OrderManagement = () => {
                     <input style={styles.input} type="number"
                       value={form.tableId}
                       onChange={e => setForm({...form, tableId: e.target.value})} />
-                  </div>
-                  <div style={styles.formGroup}>
-                    <label style={styles.label}>Waiter ID (optional)</label>
-                    <input style={styles.input} type="number"
-                      value={form.waiterId}
-                      onChange={e => setForm({...form, waiterId: e.target.value})} />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Order Type</label>
@@ -157,7 +167,7 @@ const OrderManagement = () => {
             <thead>
               <tr style={styles.tableHead}>
                 <th style={styles.th}>Order ID</th>
-                <th style={styles.th}>Customer ID</th>
+                <th style={styles.th}>Customer</th>
                 <th style={styles.th}>Type</th>
                 <th style={styles.th}>Total</th>
                 <th style={styles.th}>Status</th>
@@ -171,7 +181,14 @@ const OrderManagement = () => {
                   <td style={styles.td}>
                     <strong>#{order.orderId}</strong>
                   </td>
-                  <td style={styles.td}>Customer {order.customerId}</td>
+                  <td style={styles.td}>
+                    <div>{order.customerName || 'Walk-in'}</div>
+                    {order.customerPhone && (
+                      <div style={{fontSize:'12px', color:'#888'}}>
+                        📞 {order.customerPhone}
+                      </div>
+                    )}
+                  </td>
                   <td style={styles.td}>
                     <span style={{
                       ...styles.badge,
@@ -192,8 +209,7 @@ const OrderManagement = () => {
                     </span>
                   </td>
                   <td style={styles.td}>
-                    <select
-                      style={styles.statusSelect}
+                    <select style={styles.statusSelect}
                       value={order.orderStatus}
                       onChange={e =>
                         handleStatusUpdate(order, e.target.value)}>
@@ -204,8 +220,7 @@ const OrderManagement = () => {
                   </td>
                   <td style={styles.td}>
                     {order.orderStatus === 'DELIVERED' && (
-                      <button
-                        style={styles.invoiceBtn}
+                      <button style={styles.invoiceBtn}
                         onClick={() =>
                           navigate(`/invoice/${order.orderId}`)}>
                         🧾 Bill
@@ -224,7 +239,7 @@ const OrderManagement = () => {
                     ...styles.td, textAlign:'center',
                     color:'#888', padding:'40px'
                   }}>
-                    No orders yet. Create your first order!
+                    No orders yet.
                   </td>
                 </tr>
               )}
@@ -298,10 +313,7 @@ const styles = {
   },
   table: { width: '100%', borderCollapse: 'collapse' },
   tableHead: { background: '#f8f9fa' },
-  th: {
-    padding: '15px 20px', textAlign: 'left',
-    fontSize: '13px', fontWeight: '600', color: '#555',
-  },
+  th: { padding: '15px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#555' },
   tableRow: { borderTop: '1px solid #f0f0f0' },
   td: { padding: '15px 20px', fontSize: '14px', color: '#333' },
   badge: {

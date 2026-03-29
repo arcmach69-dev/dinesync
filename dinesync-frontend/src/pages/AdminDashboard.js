@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBlockBackNav } from '../context/useBlockBackNav';
 import api from '../services/api';
 import {
   FaUtensils, FaClipboardList, FaChair, FaBoxes,
   FaSignOutAlt, FaTachometerAlt, FaChartLine,
-  FaUsers, FaTag, FaMoneyBill
+  FaUsers, FaTag, FaMoneyBill, FaBell, FaCalendarAlt
 } from 'react-icons/fa';
 
 const AdminDashboard = () => {
+  useBlockBackNav(); 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuCount, setMenuCount] = useState(0);
@@ -37,11 +39,7 @@ const AdminDashboard = () => {
       console.error('Error fetching stats:', err);
     }
   };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
+  
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
@@ -52,8 +50,10 @@ const AdminDashboard = () => {
     { id: 'sales', label: 'Sales', icon: <FaChartLine /> },
     { id: 'kitchen', label: 'Kitchen', icon: <FaUtensils /> },
     { id: 'salary', label: 'Staff Salaries', icon: <FaUsers /> },
+    { id: 'attendance', label: 'Attendance', icon: <FaCalendarAlt /> },
     { id: 'discounts', label: 'Discounts & Coupons', icon: <FaTag /> },
     { id: 'payments', label: 'Payments', icon: <FaMoneyBill /> },
+    { id: 'notifications', label: 'Notifications', icon: <FaBell /> },
   ];
 
   const handleNav = (id) => {
@@ -65,8 +65,10 @@ const AdminDashboard = () => {
     if (id === 'sales') navigate('/sales');
     if (id === 'kitchen') navigate('/kitchen');
     if (id === 'salary') navigate('/salary');
+    if (id === 'attendance') navigate('/attendance');
     if (id === 'discounts') navigate('/discounts');
     if (id === 'payments') navigate('/payments');
+    if (id === 'notifications') navigate('/notifications');
   };
 
   const stats = [
@@ -78,7 +80,6 @@ const AdminDashboard = () => {
 
   return (
     <div style={styles.container}>
-      {/* Sidebar */}
       <div style={styles.sidebar}>
         <div style={styles.logo}>
           <span style={styles.logoIcon}>🍽️</span>
@@ -86,26 +87,23 @@ const AdminDashboard = () => {
         </div>
         <nav style={styles.nav}>
           {navItems.map(item => (
-            <div
-              key={item.id}
+            <div key={item.id}
               style={activeMenu === item.id
                 ? styles.navItemActive : styles.navItem}
-              onClick={() => handleNav(item.id)}
-            >
+              onClick={() => handleNav(item.id)}>
               <span style={styles.navIcon}>{item.icon}</span>
               <span>{item.label}</span>
             </div>
           ))}
         </nav>
-        <div style={styles.logoutBtn} onClick={handleLogout}>
+        <div style={styles.logoutBtn}
+          onClick={() => { logout(); navigate('/login'); }}>
           <FaSignOutAlt />
           <span style={{marginLeft: '10px'}}>Logout</span>
         </div>
       </div>
 
-      {/* Main Content */}
       <div style={styles.main}>
-        {/* Header */}
         <div style={styles.header}>
           <div>
             <h1 style={styles.headerTitle}>Admin Dashboard</h1>
@@ -114,7 +112,6 @@ const AdminDashboard = () => {
           <div style={styles.roleBadge}>{user?.role}</div>
         </div>
 
-        {/* Stats Cards */}
         <div style={styles.statsGrid}>
           {stats.map((stat, index) => (
             <div key={index} style={styles.statCard}>
@@ -129,7 +126,6 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Quick Actions */}
         <div style={styles.section}>
           <h2 style={styles.sectionTitle}>Quick Actions</h2>
           <div style={styles.actionsGrid}>
@@ -141,13 +137,14 @@ const AdminDashboard = () => {
               { label: 'Sales Report', color: '#9b59b6', path: '/sales' },
               { label: 'Kitchen View', color: '#1abc9c', path: '/kitchen' },
               { label: 'Staff Salaries', color: '#e67e22', path: '/salary' },
+              { label: 'Attendance', color: '#27ae60', path: '/attendance' },
               { label: 'Discounts', color: '#e91e63', path: '/discounts' },
+              { label: 'Payments', color: '#2980b9', path: '/payments' },
+              { label: 'Notifications', color: '#8e44ad', path: '/notifications' },
             ].map((btn, i) => (
-              <button
-                key={i}
+              <button key={i}
                 style={{...styles.actionBtn, background: btn.color}}
-                onClick={() => navigate(btn.path)}
-              >
+                onClick={() => navigate(btn.path)}>
                 {btn.label}
               </button>
             ))}
@@ -165,8 +162,8 @@ const styles = {
   },
   sidebar: {
     width: '250px', background: '#1a1a2e', color: 'white',
-    display: 'flex', flexDirection: 'column', padding: '20px 0',
-    overflowY: 'auto',
+    display: 'flex', flexDirection: 'column',
+    padding: '20px 0', overflowY: 'auto',
   },
   logo: {
     display: 'flex', alignItems: 'center',
@@ -178,8 +175,7 @@ const styles = {
   nav: { flex: 1, padding: '20px 0' },
   navItem: {
     display: 'flex', alignItems: 'center', padding: '12px 20px',
-    cursor: 'pointer', color: '#aaa', transition: 'all 0.2s',
-    fontSize: '14px', gap: '12px',
+    cursor: 'pointer', color: '#aaa', fontSize: '14px', gap: '12px',
   },
   navItemActive: {
     display: 'flex', alignItems: 'center', padding: '12px 20px',
@@ -204,8 +200,7 @@ const styles = {
     marginBottom: '25px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
   headerTitle: {
-    fontSize: '24px', fontWeight: '700',
-    color: '#1a1a2e', margin: 0,
+    fontSize: '24px', fontWeight: '700', color: '#1a1a2e', margin: 0,
   },
   headerSub: { color: '#888', margin: '4px 0 0', fontSize: '14px' },
   roleBadge: {
@@ -240,7 +235,7 @@ const styles = {
   },
   actionBtn: {
     padding: '15px', color: 'white', border: 'none',
-    borderRadius: '10px', fontSize: '14px',
+    borderRadius: '10px', fontSize: '13px',
     fontWeight: '600', cursor: 'pointer',
   },
 };

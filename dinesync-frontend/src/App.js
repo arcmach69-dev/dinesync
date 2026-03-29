@@ -16,10 +16,29 @@ import CustomerDashboard from './pages/CustomerDashboard';
 import Invoice from './pages/Invoice';
 import DiscountManagement from './pages/DiscountManagement';
 import PaymentManagement from './pages/PaymentManagement';
+import NotificationCenter from './pages/NotificationCenter';
+import AttendanceManagement from './pages/AttendanceManagement';
 
 const ProtectedRoute = ({ children }) => {
   const { user } = useAuth();
   return user ? children : <Navigate to="/login" />;
+};
+
+const RoleRoute = ({ children, allowedRoles }) => {
+  const { user } = useAuth();
+  
+  if (!user) return <Navigate to="/login" replace />;
+  
+  if (!allowedRoles.includes(user.role)) {
+    if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+    if (user.role === 'MANAGER') return <Navigate to="/manager" replace />;
+    if (user.role === 'WAITER') return <Navigate to="/waiter" replace />;
+    if (user.role === 'KITCHEN_STAFF') return <Navigate to="/kitchen" replace />;
+    if (user.role === 'CUSTOMER') return <Navigate to="/customer" replace />;
+    return <Navigate to="/login" replace />;
+  }
+  
+  return children;
 };
 
 function App() {
@@ -29,46 +48,84 @@ function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={
-            <ProtectedRoute><AdminDashboard /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <AdminDashboard />
+            </RoleRoute>
           } />
           <Route path="/manager" element={
-            <ProtectedRoute><ManagerDashboard /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <ManagerDashboard />
+            </RoleRoute>
           } />
           <Route path="/menu" element={
-            <ProtectedRoute><MenuManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <MenuManagement />
+            </RoleRoute>
           } />
           <Route path="/orders" element={
-            <ProtectedRoute><OrderManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER','WAITER']}>
+              <OrderManagement />
+            </RoleRoute>
           } />
           <Route path="/kitchen" element={
-            <ProtectedRoute><KitchenDashboard /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER','KITCHEN_STAFF']}>
+              <KitchenDashboard />
+            </RoleRoute>
           } />
           <Route path="/tables" element={
-            <ProtectedRoute><TableManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER','WAITER']}>
+              <TableManagement />
+            </RoleRoute>
           } />
           <Route path="/inventory" element={
-            <ProtectedRoute><InventoryManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <InventoryManagement />
+            </RoleRoute>
           } />
           <Route path="/sales" element={
-            <ProtectedRoute><SalesManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <SalesManagement />
+            </RoleRoute>
           } />
           <Route path="/waiter" element={
-            <ProtectedRoute><WaiterDashboard /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER','WAITER']}>
+              <WaiterDashboard />
+            </RoleRoute>
           } />
           <Route path="/salary" element={
-            <ProtectedRoute><SalaryManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <SalaryManagement />
+            </RoleRoute>
           } />
           <Route path="/customer" element={
-            <ProtectedRoute><CustomerDashboard /></ProtectedRoute>
+            <RoleRoute allowedRoles={['CUSTOMER']}>
+              <CustomerDashboard />
+            </RoleRoute>
           } />
           <Route path="/invoice/:orderId" element={
-            <ProtectedRoute><Invoice /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER','WAITER']}>
+              <Invoice />
+            </RoleRoute>
           } />
           <Route path="/discounts" element={
-            <ProtectedRoute><DiscountManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <DiscountManagement />
+            </RoleRoute>
           } />
           <Route path="/payments" element={
-            <ProtectedRoute><PaymentManagement /></ProtectedRoute>
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <PaymentManagement />
+            </RoleRoute>
+          } />
+          <Route path="/notifications" element={
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <NotificationCenter />
+            </RoleRoute>
+          } />
+          <Route path="/attendance" element={
+            <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
+              <AttendanceManagement />
+            </RoleRoute>
           } />
           <Route path="/" element={<Navigate to="/login" />} />
         </Routes>

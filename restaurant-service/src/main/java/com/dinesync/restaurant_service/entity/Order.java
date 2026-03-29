@@ -25,6 +25,12 @@ public class Order {
     @Column(name = "waiter_id")
     private Long waiterId;
 
+    @Column(name = "customer_name", length = 100)
+    private String customerName;
+
+    @Column(name = "customer_phone", length = 20)
+    private String customerPhone;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "order_type",nullable = false)
     private OrderType orderType;

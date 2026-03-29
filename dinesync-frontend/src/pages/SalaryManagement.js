@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { FaArrowLeft, FaPlus, FaCheck, FaTrash } from 'react-icons/fa';
@@ -14,6 +15,7 @@ const SalaryManagement = () => {
   });
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { goToDashboard } = useRoleNavigation();
 
   useEffect(() => { fetchSalaries(); }, []);
 
@@ -79,7 +81,7 @@ const SalaryManagement = () => {
           <span>🍽️</span>
           <span style={styles.logoText}>DineSync</span>
         </div>
-        <div style={styles.backBtn} onClick={() => navigate('/manager')}>
+        <div style={styles.backBtn} onClick={() => goToDashboard()}>
           <FaArrowLeft />
           <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>

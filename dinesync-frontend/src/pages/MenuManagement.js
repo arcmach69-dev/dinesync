@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import api from '../services/api';
 import { FaArrowLeft, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 
@@ -15,6 +16,7 @@ const MenuManagement = () => {
   });
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { goToDashboard } = useRoleNavigation();
 
   useEffect(() => { fetchMenuItems(); }, []);
 
@@ -35,8 +37,11 @@ const MenuManagement = () => {
       }
       setShowForm(false);
       setEditItem(null);
-      setForm({ dishName: '', category: 'MAIN_COURSE', spiceLevel: 'MILD',
-        price: '', availability: 'AVAILABLE', stockQuantity: '', variant: '', imageUrl: '' });
+      setForm({
+        dishName: '', category: 'MAIN_COURSE', spiceLevel: 'MILD',
+        price: '', availability: 'AVAILABLE', stockQuantity: '',
+        variant: '', imageUrl: '',
+      });
       fetchMenuItems();
     } catch (err) { console.error(err); }
   };
@@ -61,21 +66,21 @@ const MenuManagement = () => {
 
   return (
     <div style={styles.container}>
-      {/* Sidebar */}
       <div style={styles.sidebar}>
         <div style={styles.logo}>
           <span>🍽️</span>
           <span style={styles.logoText}>DineSync</span>
         </div>
-        <div style={styles.backBtn} onClick={() => navigate('/admin')}>
-          <FaArrowLeft /> <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
+        <div style={styles.backBtn} onClick={() => goToDashboard()}>
+          <FaArrowLeft />
+          <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
-        <div style={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
+        <div style={styles.logoutBtn}
+          onClick={() => { logout(); navigate('/login'); }}>
           🚪 Logout
         </div>
       </div>
 
-      {/* Main */}
       <div style={styles.main}>
         <div style={styles.header}>
           <div>
@@ -87,7 +92,6 @@ const MenuManagement = () => {
           </button>
         </div>
 
-        {/* Form Modal */}
         {showForm && (
           <div style={styles.modal}>
             <div style={styles.modalBox}>
@@ -99,7 +103,8 @@ const MenuManagement = () => {
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Dish Name</label>
                     <input style={styles.input} value={form.dishName}
-                      onChange={e => setForm({...form, dishName: e.target.value})} required />
+                      onChange={e => setForm({...form, dishName: e.target.value})}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Category</label>
@@ -111,8 +116,10 @@ const MenuManagement = () => {
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Price ($)</label>
-                    <input style={styles.input} type="number" step="0.01" value={form.price}
-                      onChange={e => setForm({...form, price: e.target.value})} required />
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.price}
+                      onChange={e => setForm({...form, price: e.target.value})}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Spice Level</label>
@@ -124,14 +131,17 @@ const MenuManagement = () => {
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Stock Quantity</label>
-                    <input style={styles.input} type="number" value={form.stockQuantity}
-                      onChange={e => setForm({...form, stockQuantity: e.target.value})} required />
+                    <input style={styles.input} type="number"
+                      value={form.stockQuantity}
+                      onChange={e => setForm({...form, stockQuantity: e.target.value})}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Availability</label>
                     <select style={styles.input} value={form.availability}
                       onChange={e => setForm({...form, availability: e.target.value})}>
-                      {['AVAILABLE','NOT_AVAILABLE'].map(a => <option key={a}>{a}</option>)}
+                      {['AVAILABLE','NOT_AVAILABLE'].map(a =>
+                        <option key={a}>{a}</option>)}
                     </select>
                   </div>
                   <div style={styles.formGroup}>
@@ -159,7 +169,6 @@ const MenuManagement = () => {
           </div>
         )}
 
-        {/* Menu Items Table */}
         <div style={styles.tableBox}>
           <table style={styles.table}>
             <thead>
@@ -178,7 +187,8 @@ const MenuManagement = () => {
                 <tr key={item.itemId} style={styles.tableRow}>
                   <td style={styles.td}><strong>{item.dishName}</strong></td>
                   <td style={styles.td}>
-                    <span style={{...styles.badge, background: categoryColors[item.category]}}>
+                    <span style={{...styles.badge,
+                      background: categoryColors[item.category]}}>
                       {item.category}
                     </span>
                   </td>
@@ -187,15 +197,18 @@ const MenuManagement = () => {
                   <td style={styles.td}>{item.stockQuantity}</td>
                   <td style={styles.td}>
                     <span style={{...styles.badge,
-                      background: item.availability === 'AVAILABLE' ? '#2ecc71' : '#e74c3c'}}>
+                      background: item.availability === 'AVAILABLE'
+                        ? '#2ecc71' : '#e74c3c'}}>
                       {item.availability}
                     </span>
                   </td>
                   <td style={styles.td}>
-                    <button style={styles.editBtn} onClick={() => handleEdit(item)}>
+                    <button style={styles.editBtn}
+                      onClick={() => handleEdit(item)}>
                       <FaEdit />
                     </button>
-                    <button style={styles.deleteBtn} onClick={() => handleDelete(item.itemId)}>
+                    <button style={styles.deleteBtn}
+                      onClick={() => handleDelete(item.itemId)}>
                       <FaTrash />
                     </button>
                   </td>
@@ -253,8 +266,8 @@ const styles = {
   formGroup: { display: 'flex', flexDirection: 'column' },
   label: { fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px' },
   input: {
-    padding: '10px 12px', border: '2px solid #e0e0e0', borderRadius: '8px',
-    fontSize: '14px', outline: 'none',
+    padding: '10px 12px', border: '2px solid #e0e0e0',
+    borderRadius: '8px', fontSize: '14px', outline: 'none',
   },
   modalBtns: { display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px' },
   cancelBtn: {

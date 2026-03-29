@@ -4,23 +4,23 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
-    const token = localStorage.getItem('token');
-    const role = localStorage.getItem('role');
-    const email = localStorage.getItem('email');
+    const token = sessionStorage.getItem('token');
+    const role = sessionStorage.getItem('role');
+    const email = sessionStorage.getItem('email');
     return token ? { token, role, email } : null;
   });
 
   const login = (data) => {
-    localStorage.setItem('token', data.token);
-    localStorage.setItem('role', data.role);
-    localStorage.setItem('email', data.email);
+    sessionStorage.setItem('token', data.token);
+    sessionStorage.setItem('role', data.role);
+    sessionStorage.setItem('email', data.email);
     setUser(data);
   };
 
   const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('role');
-    localStorage.removeItem('email');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('role');
+    sessionStorage.removeItem('email');
     setUser(null);
   };
 

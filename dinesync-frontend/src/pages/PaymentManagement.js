@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { FaArrowLeft } from 'react-icons/fa';
@@ -8,6 +9,7 @@ const PaymentManagement = () => {
   const [payments, setPayments] = useState([]);
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const { goToDashboard } = useRoleNavigation();
 
   useEffect(() => { fetchPayments(); }, []);
 
@@ -43,7 +45,7 @@ const PaymentManagement = () => {
           <span>🍽️</span>
           <span style={styles.logoText}>DineSync</span>
         </div>
-        <div style={styles.backBtn} onClick={() => navigate('/admin')}>
+        <div style={styles.backBtn} onClick={() => goToDashboard()}>
           <FaArrowLeft />
           <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>

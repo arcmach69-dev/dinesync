@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 
@@ -7,6 +8,7 @@ const Invoice = () => {
   const { orderId } = useParams();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { goToDashboard } = useRoleNavigation();
   const printRef = useRef();
   const [order, setOrder] = useState(null);
   const [payment, setPayment] = useState(null);
@@ -37,20 +39,81 @@ const Invoice = () => {
   };
 
   const handlePayment = async () => {
-    try {
-      await api.post('/api/payments', {
-        orderId: parseInt(orderId),
-        amount: order.totalAmount,
-        paymentMethod,
-        paymentStatus: 'PAID',
-        paidAt: new Date().toISOString(),
-      });
-      setPaid(true);
-      setShowPaymentForm(false);
-      fetchPayment();
-    } catch (err) { console.error(err); }
-  };
+  try {
+    // Step 1 — Record payment
+    await api.post('/api/payments', {
+      orderId: parseInt(orderId),
+      amount: order.totalAmount,
+      paymentMethod,
+      paymentStatus: 'PAID',
+      paidAt: new Date().toISOString(),
+    });
 
+    // Step 2 — Auto update sales
+    const today = new Date().toISOString().split('T')[0];
+    const orderAmount = parseFloat(order.totalAmount);
+    const tax = orderAmount * 0.08;
+    const totalWithTax = orderAmount + tax;
+    const kitchenCost = totalWithTax * 0.4;
+    const grossProfit = totalWithTax * 0.3;
+    const netProfit = totalWithTax * 0.25;
+    const totalInvestment = totalWithTax * 0.5;
+
+    try {
+      const salesRes = await api.get('/api/sales');
+      const todaySales = salesRes.data.find(
+        s => s.saleDate === today
+      );
+
+      if (todaySales) {
+        await api.put(`/api/sales/${todaySales.saleId}`, {
+          saleDate: today,
+          totalOrders: todaySales.totalOrders + 1,
+          totalRevenue: (
+            parseFloat(todaySales.totalRevenue) + totalWithTax
+          ).toFixed(2),
+          totalRefunds: todaySales.totalRefunds,
+          cancellations: todaySales.cancellations,
+          kitchenCost: (
+            parseFloat(todaySales.kitchenCost) + kitchenCost
+          ).toFixed(2),
+          grossProfit: (
+            parseFloat(todaySales.grossProfit) + grossProfit
+          ).toFixed(2),
+          netProfit: (
+            parseFloat(todaySales.netProfit) + netProfit
+          ).toFixed(2),
+          totalInvestment: (
+            parseFloat(todaySales.totalInvestment) + totalInvestment
+          ).toFixed(2),
+        });
+      } else {
+        await api.post('/api/sales', {
+          saleDate: today,
+          totalOrders: 1,
+          totalRevenue: totalWithTax.toFixed(2),
+          totalRefunds: '0.00',
+          cancellations: 0,
+          kitchenCost: kitchenCost.toFixed(2),
+          grossProfit: grossProfit.toFixed(2),
+          netProfit: netProfit.toFixed(2),
+          totalInvestment: totalInvestment.toFixed(2),
+        });
+      }
+      console.log('Sales updated successfully');
+    } catch (salesErr) {
+      console.error('Sales update error:', salesErr);
+    }
+
+    setPaid(true);
+    setShowPaymentForm(false);
+    fetchPayment();
+    alert('✅ Payment confirmed! Sales updated.');
+  } catch (err) {
+    console.error(err);
+    alert('Payment failed. Try again.');
+  }
+};
   const handlePrint = () => {
     window.print();
   };
@@ -71,7 +134,7 @@ const Invoice = () => {
       {/* Action Buttons - hidden when printing */}
       <div style={styles.actionBar} className="no-print">
         <button style={styles.backBtn}
-          onClick={() => navigate(-1)}>
+          onClick={() => goToDashboard()}>
           ← Back
         </button>
         <div style={styles.actionBtns}>

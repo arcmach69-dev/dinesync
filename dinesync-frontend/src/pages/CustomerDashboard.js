@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useBlockBackNav } from '../context/useBlockBackNav';
 import api from '../services/api';
 import { FaSignOutAlt, FaUtensils, FaClipboardList, FaShoppingCart, FaTimes } from 'react-icons/fa';
 
 const CustomerDashboard = () => {
+useBlockBackNav(); 
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuItems, setMenuItems] = useState([]);

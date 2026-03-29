@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { FaArrowLeft, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
@@ -13,6 +14,7 @@ const TableManagement = () => {
   });
   const { logout } = useAuth();
   const navigate = useNavigate();
+const { goToDashboard } = useRoleNavigation();
 
   useEffect(() => { fetchTables(); }, []);
 
@@ -62,7 +64,7 @@ const TableManagement = () => {
           <span>🍽️</span>
           <span style={styles.logoText}>DineSync</span>
         </div>
-        <div style={styles.backBtn} onClick={() => navigate('/admin')}>
+        <div style={styles.backBtn} onClick={() => goToDashboard()}>
           <FaArrowLeft /> <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
         <div style={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
