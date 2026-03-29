@@ -18,17 +18,11 @@ import DiscountManagement from './pages/DiscountManagement';
 import PaymentManagement from './pages/PaymentManagement';
 import NotificationCenter from './pages/NotificationCenter';
 import AttendanceManagement from './pages/AttendanceManagement';
-
-const ProtectedRoute = ({ children }) => {
-  const { user } = useAuth();
-  return user ? children : <Navigate to="/login" />;
-};
+import StaffManagement from './pages/StaffManagement';
 
 const RoleRoute = ({ children, allowedRoles }) => {
   const { user } = useAuth();
-  
   if (!user) return <Navigate to="/login" replace />;
-  
   if (!allowedRoles.includes(user.role)) {
     if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
     if (user.role === 'MANAGER') return <Navigate to="/manager" replace />;
@@ -37,7 +31,6 @@ const RoleRoute = ({ children, allowedRoles }) => {
     if (user.role === 'CUSTOMER') return <Navigate to="/customer" replace />;
     return <Navigate to="/login" replace />;
   }
-  
   return children;
 };
 
@@ -125,6 +118,11 @@ function App() {
           <Route path="/attendance" element={
             <RoleRoute allowedRoles={['ADMIN','MANAGER']}>
               <AttendanceManagement />
+            </RoleRoute>
+          } />
+          <Route path="/staff" element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <StaffManagement />
             </RoleRoute>
           } />
           <Route path="/" element={<Navigate to="/login" />} />

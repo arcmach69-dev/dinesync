@@ -6,11 +6,12 @@ import api from '../services/api';
 import {
   FaUtensils, FaClipboardList, FaChair, FaBoxes,
   FaSignOutAlt, FaTachometerAlt, FaChartLine,
-  FaUsers, FaTag, FaMoneyBill, FaBell, FaCalendarAlt
+  FaUsers, FaTag, FaMoneyBill, FaBell, FaCalendarAlt,
+  FaUserPlus
 } from 'react-icons/fa';
 
 const AdminDashboard = () => {
-  useBlockBackNav(); 
+  useBlockBackNav();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuCount, setMenuCount] = useState(0);
@@ -19,9 +20,7 @@ const AdminDashboard = () => {
   const [inventoryCount, setInventoryCount] = useState(0);
   const [activeMenu, setActiveMenu] = useState('dashboard');
 
-  useEffect(() => {
-    fetchStats();
-  }, []);
+  useEffect(() => { fetchStats(); }, []);
 
   const fetchStats = async () => {
     try {
@@ -35,14 +34,12 @@ const AdminDashboard = () => {
       setOrderCount(orders.data.length);
       setTableCount(tables.data.length);
       setInventoryCount(inventory.data.length);
-    } catch (err) {
-      console.error('Error fetching stats:', err);
-    }
+    } catch (err) { console.error(err); }
   };
-  
 
   const navItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <FaTachometerAlt /> },
+    { id: 'staff', label: 'Staff Management', icon: <FaUserPlus /> },
     { id: 'menu', label: 'Menu Management', icon: <FaUtensils /> },
     { id: 'orders', label: 'Orders', icon: <FaClipboardList /> },
     { id: 'tables', label: 'Tables', icon: <FaChair /> },
@@ -58,6 +55,7 @@ const AdminDashboard = () => {
 
   const handleNav = (id) => {
     setActiveMenu(id);
+    if (id === 'staff') navigate('/staff');
     if (id === 'menu') navigate('/menu');
     if (id === 'orders') navigate('/orders');
     if (id === 'tables') navigate('/tables');
@@ -97,7 +95,7 @@ const AdminDashboard = () => {
           ))}
         </nav>
         <div style={styles.logoutBtn}
-          onClick={() => { logout(); navigate('/login'); }}>
+          onClick={() => { logout(); navigate('/login', { replace: true }); }}>
           <FaSignOutAlt />
           <span style={{marginLeft: '10px'}}>Logout</span>
         </div>
@@ -130,6 +128,7 @@ const AdminDashboard = () => {
           <h2 style={styles.sectionTitle}>Quick Actions</h2>
           <div style={styles.actionsGrid}>
             {[
+              { label: 'Staff Management', color: '#1a1a2e', path: '/staff' },
               { label: 'Add Menu Item', color: '#f5a623', path: '/menu' },
               { label: 'View Orders', color: '#2ecc71', path: '/orders' },
               { label: 'Manage Tables', color: '#3498db', path: '/tables' },
@@ -156,10 +155,7 @@ const AdminDashboard = () => {
 };
 
 const styles = {
-  container: {
-    display: 'flex', height: '100vh',
-    fontFamily: "'Segoe UI', sans-serif",
-  },
+  container: { display: 'flex', height: '100vh', fontFamily: "'Segoe UI', sans-serif" },
   sidebar: {
     width: '250px', background: '#1a1a2e', color: 'white',
     display: 'flex', flexDirection: 'column',
@@ -167,8 +163,7 @@ const styles = {
   },
   logo: {
     display: 'flex', alignItems: 'center',
-    padding: '0 20px 30px',
-    borderBottom: '1px solid #2d2d44',
+    padding: '0 20px 30px', borderBottom: '1px solid #2d2d44',
   },
   logoIcon: { fontSize: '28px', marginRight: '10px' },
   logoText: { fontSize: '22px', fontWeight: '800', color: '#f5a623' },
@@ -181,8 +176,7 @@ const styles = {
     display: 'flex', alignItems: 'center', padding: '12px 20px',
     cursor: 'pointer', color: 'white',
     background: 'rgba(245,166,35,0.15)',
-    borderLeft: '3px solid #f5a623',
-    fontSize: '14px', gap: '12px',
+    borderLeft: '3px solid #f5a623', fontSize: '14px', gap: '12px',
   },
   navIcon: { fontSize: '16px' },
   logoutBtn: {
@@ -190,18 +184,13 @@ const styles = {
     cursor: 'pointer', color: '#e74c3c',
     borderTop: '1px solid #2d2d44', fontSize: '14px',
   },
-  main: {
-    flex: 1, background: '#f0f2f5',
-    overflow: 'auto', padding: '30px',
-  },
+  main: { flex: 1, background: '#f0f2f5', overflow: 'auto', padding: '30px' },
   header: {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     background: 'white', padding: '20px 30px', borderRadius: '12px',
     marginBottom: '25px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
-  headerTitle: {
-    fontSize: '24px', fontWeight: '700', color: '#1a1a2e', margin: 0,
-  },
+  headerTitle: { fontSize: '24px', fontWeight: '700', color: '#1a1a2e', margin: 0 },
   headerSub: { color: '#888', margin: '4px 0 0', fontSize: '14px' },
   roleBadge: {
     background: '#f5a623', color: 'white', padding: '6px 16px',
@@ -216,27 +205,18 @@ const styles = {
     display: 'flex', alignItems: 'center', gap: '15px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
-  statIcon: {
-    padding: '15px', borderRadius: '10px',
-    color: 'white', fontSize: '20px',
-  },
+  statIcon: { padding: '15px', borderRadius: '10px', color: 'white', fontSize: '20px' },
   statValue: { fontSize: '28px', fontWeight: '700', color: '#1a1a2e' },
   statTitle: { color: '#888', fontSize: '13px' },
   section: {
     background: 'white', borderRadius: '12px', padding: '25px',
     boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
-  sectionTitle: {
-    fontSize: '18px', fontWeight: '700',
-    color: '#1a1a2e', marginBottom: '20px',
-  },
-  actionsGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px',
-  },
+  sectionTitle: { fontSize: '18px', fontWeight: '700', color: '#1a1a2e', marginBottom: '20px' },
+  actionsGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' },
   actionBtn: {
     padding: '15px', color: 'white', border: 'none',
-    borderRadius: '10px', fontSize: '13px',
-    fontWeight: '600', cursor: 'pointer',
+    borderRadius: '10px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
   },
 };
 

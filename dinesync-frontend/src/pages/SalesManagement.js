@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import api from '../services/api';
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { FaArrowLeft, FaPlus, FaTrash } from 'react-icons/fa';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  Tooltip, ResponsiveContainer, LineChart, Line, Legend
+} from 'recharts';
 
 const SalesManagement = () => {
   const [sales, setSales] = useState([]);
   const [showForm, setShowForm] = useState(false);
-  const [editItem, setEditItem] = useState(null);
+  const [activeView, setActiveView] = useState('daily');
   const [form, setForm] = useState({
-    saleDate: '', totalOrders: '', totalRevenue: '',
-    totalRefunds: '', cancellations: '', kitchenCost: '',
-    grossProfit: '', netProfit: '', totalInvestment: '',
+    saleDate: new Date().toISOString().split('T')[0],
+    totalOrders: '', totalRevenue: '', totalRefunds: '0',
+    cancellations: '0', kitchenCost: '', grossProfit: '',
+    netProfit: '', totalInvestment: '',
   });
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { goToDashboard } = useRoleNavigation();
 
@@ -31,26 +35,16 @@ const SalesManagement = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      if (editItem) {
-        await api.put(`/api/sales/${editItem.saleId}`, form);
-      } else {
-        await api.post('/api/sales', form);
-      }
+      await api.post('/api/sales', form);
       setShowForm(false);
-      setEditItem(null);
       setForm({
-        saleDate: '', totalOrders: '', totalRevenue: '',
-        totalRefunds: '', cancellations: '', kitchenCost: '',
-        grossProfit: '', netProfit: '', totalInvestment: '',
+        saleDate: new Date().toISOString().split('T')[0],
+        totalOrders: '', totalRevenue: '', totalRefunds: '0',
+        cancellations: '0', kitchenCost: '', grossProfit: '',
+        netProfit: '', totalInvestment: '',
       });
       fetchSales();
     } catch (err) { console.error(err); }
-  };
-
-  const handleEdit = (item) => {
-    setEditItem(item);
-    setForm(item);
-    setShowForm(true);
   };
 
   const handleDelete = async (id) => {
@@ -60,9 +54,78 @@ const SalesManagement = () => {
     }
   };
 
-  const totalRevenue = sales.reduce((sum, s) => sum + parseFloat(s.totalRevenue || 0), 0);
-  const totalProfit = sales.reduce((sum, s) => sum + parseFloat(s.netProfit || 0), 0);
-  const totalOrders = sales.reduce((sum, s) => sum + parseInt(s.totalOrders || 0), 0);
+  // Aggregate weekly data
+  const getWeeklyData = () => {
+    const weekly = {};
+    sales.forEach(s => {
+      const date = new Date(s.saleDate);
+      const week = `Week ${Math.ceil(date.getDate() / 7)} - ${
+        date.toLocaleString('default', {month: 'short'})
+      }`;
+      if (!weekly[week]) {
+        weekly[week] = {
+          week, totalRevenue: 0, netProfit: 0, totalOrders: 0
+        };
+      }
+      weekly[week].totalRevenue += parseFloat(s.totalRevenue || 0);
+      weekly[week].netProfit += parseFloat(s.netProfit || 0);
+      weekly[week].totalOrders += parseInt(s.totalOrders || 0);
+    });
+    return Object.values(weekly);
+  };
+
+  // Aggregate monthly data
+  const getMonthlyData = () => {
+    const monthly = {};
+    sales.forEach(s => {
+      const date = new Date(s.saleDate);
+      const month = date.toLocaleString('default', {
+        month: 'long', year: 'numeric'
+      });
+      if (!monthly[month]) {
+        monthly[month] = {
+          month, totalRevenue: 0, netProfit: 0, totalOrders: 0
+        };
+      }
+      monthly[month].totalRevenue += parseFloat(s.totalRevenue || 0);
+      monthly[month].netProfit += parseFloat(s.netProfit || 0);
+      monthly[month].totalOrders += parseInt(s.totalOrders || 0);
+    });
+    return Object.values(monthly);
+  };
+
+  const totalRevenue = sales.reduce(
+    (sum, s) => sum + parseFloat(s.totalRevenue || 0), 0
+  );
+  const totalProfit = sales.reduce(
+    (sum, s) => sum + parseFloat(s.netProfit || 0), 0
+  );
+  const totalOrders = sales.reduce(
+    (sum, s) => sum + parseInt(s.totalOrders || 0), 0
+  );
+
+  const isAdmin = user?.role === 'ADMIN';
+
+  const chartData = activeView === 'daily'
+    ? sales.map(s => ({
+        date: s.saleDate,
+        Revenue: parseFloat(s.totalRevenue || 0),
+        Profit: parseFloat(s.netProfit || 0),
+        Orders: parseInt(s.totalOrders || 0),
+      }))
+    : activeView === 'weekly'
+    ? getWeeklyData().map(w => ({
+        date: w.week,
+        Revenue: parseFloat(w.totalRevenue.toFixed(2)),
+        Profit: parseFloat(w.netProfit.toFixed(2)),
+        Orders: w.totalOrders,
+      }))
+    : getMonthlyData().map(m => ({
+        date: m.month,
+        Revenue: parseFloat(m.totalRevenue.toFixed(2)),
+        Profit: parseFloat(m.netProfit.toFixed(2)),
+        Orders: m.totalOrders,
+      }));
 
   return (
     <div style={styles.container}>
@@ -72,9 +135,11 @@ const SalesManagement = () => {
           <span style={styles.logoText}>DineSync</span>
         </div>
         <div style={styles.backBtn} onClick={() => goToDashboard()}>
-          <FaArrowLeft /> <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
+          <FaArrowLeft />
+          <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
-        <div style={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
+        <div style={styles.logoutBtn}
+          onClick={() => { logout(); navigate('/login', { replace: true }); }}>
           🚪 Logout
         </div>
       </div>
@@ -82,7 +147,7 @@ const SalesManagement = () => {
       <div style={styles.main}>
         <div style={styles.header}>
           <div>
-            <h1 style={styles.title}>Sales Analytics</h1>
+            <h1 style={styles.title}>📊 Sales Analytics</h1>
             <p style={styles.subtitle}>{sales.length} records</p>
           </div>
           <button style={styles.addBtn} onClick={() => setShowForm(true)}>
@@ -94,80 +159,136 @@ const SalesManagement = () => {
         <div style={styles.statsGrid}>
           <div style={styles.statCard}>
             <div style={styles.statLabel}>Total Revenue</div>
-            <div style={{...styles.statValue, color: '#2ecc71'}}>
+            <div style={{...styles.statValue, color:'#2ecc71'}}>
               ${totalRevenue.toFixed(2)}
             </div>
           </div>
+          {isAdmin && (
+            <div style={styles.statCard}>
+              <div style={styles.statLabel}>Net Profit</div>
+              <div style={{...styles.statValue, color:'#3498db'}}>
+                ${totalProfit.toFixed(2)}
+              </div>
+            </div>
+          )}
           <div style={styles.statCard}>
-            <div style={styles.statLabel}>Net Profit</div>
-            <div style={{...styles.statValue, color: '#3498db'}}>
-              ${totalProfit.toFixed(2)}
+            <div style={styles.statLabel}>Total Orders</div>
+            <div style={{...styles.statValue, color:'#f5a623'}}>
+              {totalOrders}
             </div>
           </div>
           <div style={styles.statCard}>
-            <div style={styles.statLabel}>Total Orders</div>
-            <div style={{...styles.statValue, color: '#f5a623'}}>
-              {totalOrders}
+            <div style={styles.statLabel}>Avg Revenue/Day</div>
+            <div style={{...styles.statValue, color:'#9b59b6'}}>
+              ${sales.length > 0
+                ? (totalRevenue / sales.length).toFixed(2)
+                : '0.00'}
             </div>
           </div>
         </div>
 
+        {/* View Toggle */}
+        <div style={styles.viewToggle}>
+          {['daily','weekly','monthly'].map(view => (
+            <button key={view}
+              style={{
+                ...styles.viewBtn,
+                background: activeView === view ? '#f5a623' : 'white',
+                color: activeView === view ? 'white' : '#333',
+              }}
+              onClick={() => setActiveView(view)}>
+              {view.charAt(0).toUpperCase() + view.slice(1)}
+            </button>
+          ))}
+        </div>
+
         {/* Chart */}
-        {sales.length > 0 && (
+        {chartData.length > 0 && (
           <div style={styles.chartBox}>
-            <h3 style={styles.chartTitle}>Revenue vs Net Profit</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={sales}>
+            <h3 style={styles.chartTitle}>
+              {activeView === 'daily' && '📅 Daily Sales'}
+              {activeView === 'weekly' && '📅 Weekly Sales'}
+              {activeView === 'monthly' && '📅 Monthly Sales'}
+            </h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="saleDate" />
+                <XAxis dataKey="date" tick={{fontSize: 11}} />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="totalRevenue" fill="#f5a623" name="Revenue" />
-                <Bar dataKey="netProfit" fill="#2ecc71" name="Net Profit" />
+                <Legend />
+                <Bar dataKey="Revenue" fill="#2ecc71" />
+                {isAdmin && <Bar dataKey="Profit" fill="#3498db" />}
+                <Bar dataKey="Orders" fill="#f5a623" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         )}
 
+        {/* Form Modal */}
         {showForm && (
           <div style={styles.modal}>
             <div style={styles.modalBox}>
-              <h2 style={styles.modalTitle}>
-                {editItem ? 'Edit Sales Record' : 'Add Sales Record'}
-              </h2>
+              <h2 style={styles.modalTitle}>Add Sales Record</h2>
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGrid}>
-                  {[
-                    { key: 'saleDate', label: 'Sale Date', type: 'date' },
-                    { key: 'totalOrders', label: 'Total Orders', type: 'number' },
-                    { key: 'totalRevenue', label: 'Total Revenue', type: 'number' },
-                    { key: 'totalRefunds', label: 'Total Refunds', type: 'number' },
-                    { key: 'cancellations', label: 'Cancellations', type: 'number' },
-                    { key: 'kitchenCost', label: 'Kitchen Cost', type: 'number' },
-                    { key: 'grossProfit', label: 'Gross Profit', type: 'number' },
-                    { key: 'netProfit', label: 'Net Profit', type: 'number' },
-                    { key: 'totalInvestment', label: 'Total Investment', type: 'number' },
-                  ].map(field => (
-                    <div key={field.key} style={styles.formGroup}>
-                      <label style={styles.label}>{field.label}</label>
-                      <input
-                        style={styles.input}
-                        type={field.type}
-                        step={field.type === 'number' ? '0.01' : undefined}
-                        value={form[field.key]}
-                        onChange={e => setForm({...form, [field.key]: e.target.value})}
-                        required
-                      />
-                    </div>
-                  ))}
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Date</label>
+                    <input style={styles.input} type="date"
+                      value={form.saleDate}
+                      onChange={e => setForm({...form, saleDate: e.target.value})}
+                      required />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Total Orders</label>
+                    <input style={styles.input} type="number"
+                      value={form.totalOrders}
+                      onChange={e => setForm({...form, totalOrders: e.target.value})}
+                      required />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Total Revenue ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.totalRevenue}
+                      onChange={e => setForm({...form, totalRevenue: e.target.value})}
+                      required />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Total Refunds ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.totalRefunds}
+                      onChange={e => setForm({...form, totalRefunds: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Kitchen Cost ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.kitchenCost}
+                      onChange={e => setForm({...form, kitchenCost: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Gross Profit ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.grossProfit}
+                      onChange={e => setForm({...form, grossProfit: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Net Profit ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.netProfit}
+                      onChange={e => setForm({...form, netProfit: e.target.value})} />
+                  </div>
+                  <div style={styles.formGroup}>
+                    <label style={styles.label}>Total Investment ($)</label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.totalInvestment}
+                      onChange={e => setForm({...form, totalInvestment: e.target.value})} />
+                  </div>
                 </div>
                 <div style={styles.modalBtns}>
                   <button type="button" style={styles.cancelBtn}
-                    onClick={() => { setShowForm(false); setEditItem(null); }}>
-                    Cancel
-                  </button>
+                    onClick={() => setShowForm(false)}>Cancel</button>
                   <button type="submit" style={styles.saveBtn}>
-                    {editItem ? 'Update' : 'Add Record'}
+                    Add Record
                   </button>
                 </div>
               </form>
@@ -175,6 +296,7 @@ const SalesManagement = () => {
           </div>
         )}
 
+        {/* Sales Table */}
         <div style={styles.tableBox}>
           <table style={styles.table}>
             <thead>
@@ -184,35 +306,42 @@ const SalesManagement = () => {
                 <th style={styles.th}>Revenue</th>
                 <th style={styles.th}>Refunds</th>
                 <th style={styles.th}>Kitchen Cost</th>
-                <th style={styles.th}>Net Profit</th>
+                {isAdmin && <th style={styles.th}>Net Profit</th>}
+                {isAdmin && <th style={styles.th}>Investment</th>}
                 <th style={styles.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {sales.map(item => (
-                <tr key={item.saleId} style={styles.tableRow}>
-                  <td style={styles.td}>{item.saleDate}</td>
-                  <td style={styles.td}>{item.totalOrders}</td>
+              {sales.map(sale => (
+                <tr key={sale.saleId} style={styles.tableRow}>
+                  <td style={styles.td}><strong>{sale.saleDate}</strong></td>
+                  <td style={styles.td}>{sale.totalOrders}</td>
                   <td style={styles.td}>
-                    <span style={{color:'#2ecc71', fontWeight:'600'}}>
-                      ${item.totalRevenue}
-                    </span>
+                    <strong style={{color:'#2ecc71'}}>
+                      ${parseFloat(sale.totalRevenue || 0).toFixed(2)}
+                    </strong>
                   </td>
                   <td style={styles.td}>
-                    <span style={{color:'#e74c3c'}}>${item.totalRefunds}</span>
-                  </td>
-                  <td style={styles.td}>${item.kitchenCost}</td>
-                  <td style={styles.td}>
-                    <span style={{color:'#3498db', fontWeight:'700'}}>
-                      ${item.netProfit}
-                    </span>
+                    ${parseFloat(sale.totalRefunds || 0).toFixed(2)}
                   </td>
                   <td style={styles.td}>
-                    <button style={styles.editBtn} onClick={() => handleEdit(item)}>
-                      <FaEdit />
-                    </button>
+                    ${parseFloat(sale.kitchenCost || 0).toFixed(2)}
+                  </td>
+                  {isAdmin && (
+                    <td style={styles.td}>
+                      <strong style={{color:'#3498db'}}>
+                        ${parseFloat(sale.netProfit || 0).toFixed(2)}
+                      </strong>
+                    </td>
+                  )}
+                  {isAdmin && (
+                    <td style={styles.td}>
+                      ${parseFloat(sale.totalInvestment || 0).toFixed(2)}
+                    </td>
+                  )}
+                  <td style={styles.td}>
                     <button style={styles.deleteBtn}
-                      onClick={() => handleDelete(item.saleId)}>
+                      onClick={() => handleDelete(sale.saleId)}>
                       <FaTrash />
                     </button>
                   </td>
@@ -220,8 +349,10 @@ const SalesManagement = () => {
               ))}
               {sales.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{...styles.td, textAlign:'center',
-                    color:'#888', padding:'40px'}}>
+                  <td colSpan="8" style={{
+                    ...styles.td, textAlign:'center',
+                    color:'#888', padding:'40px'
+                  }}>
                     No sales records yet.
                   </td>
                 </tr>
@@ -265,7 +396,7 @@ const styles = {
     fontWeight: '600', cursor: 'pointer',
   },
   statsGrid: {
-    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+    display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)',
     gap: '20px', marginBottom: '25px',
   },
   statCard: {
@@ -273,7 +404,17 @@ const styles = {
     boxShadow: '0 2px 10px rgba(0,0,0,0.05)', textAlign: 'center',
   },
   statLabel: { color: '#888', fontSize: '13px', marginBottom: '8px' },
-  statValue: { fontSize: '32px', fontWeight: '800' },
+  statValue: { fontSize: '28px', fontWeight: '800' },
+  viewToggle: {
+    display: 'flex', gap: '10px', marginBottom: '20px',
+    background: 'white', padding: '10px', borderRadius: '12px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+  },
+  viewBtn: {
+    padding: '8px 20px', border: '2px solid #e0e0e0',
+    borderRadius: '8px', cursor: 'pointer',
+    fontSize: '14px', fontWeight: '600',
+  },
   chartBox: {
     background: 'white', borderRadius: '12px', padding: '25px',
     marginBottom: '25px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
@@ -314,10 +455,6 @@ const styles = {
   th: { padding: '15px 20px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#555' },
   tableRow: { borderTop: '1px solid #f0f0f0' },
   td: { padding: '15px 20px', fontSize: '14px', color: '#333' },
-  editBtn: {
-    background: '#3498db', color: 'white', border: 'none',
-    padding: '7px 10px', borderRadius: '6px', cursor: 'pointer', marginRight: '5px',
-  },
   deleteBtn: {
     background: '#e74c3c', color: 'white', border: 'none',
     padding: '7px 10px', borderRadius: '6px', cursor: 'pointer',

@@ -71,12 +71,25 @@ useBlockBackNav();
   const placeOrder = async () => {
     if (cart.length === 0) return;
     try {
-      await api.post('/api/orders', {
+      const orderRes = await api.post('/api/orders', {
         customerId: 1,
         orderType,
         orderStatus: 'RECEIVED',
         totalAmount: totalAmount.toFixed(2),
       });
+
+      // Auto send order confirmation email
+      try {
+        await api.post('/api/email/order-confirmation', {
+          to: user?.email,
+          orderId: orderRes.data.orderId,
+          orderType,
+          amount: parseFloat(totalAmount.toFixed(2)),
+        });
+      } catch (emailErr) {
+        console.error('Email failed:', emailErr);
+      }
+
       setCart([]);
       setShowCart(false);
       setOrderPlaced(true);

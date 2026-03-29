@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useRoleNavigation } from '../context/useRoleNavigation';
 import { useAuth } from '../context/AuthContext';
+import { useRoleNavigation } from '../context/useRoleNavigation';
 import api from '../services/api';
-import { FaArrowLeft, FaPlus, FaEdit, FaTrash, FaExclamationTriangle } from 'react-icons/fa';
+import { FaArrowLeft, FaPlus, FaEdit, FaTrash } from 'react-icons/fa';
 
 const InventoryManagement = () => {
   const [inventory, setInventory] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [form, setForm] = useState({
-    ingredientName: '', unit: '', quantityAvailable: '',
-    quantityUsed: '', minimumThreshold: '', alertSent: false,
+    ingredientName: '', quantityAvailable: '',
+    quantityUsed: '', minimumThreshold: '',
+    unit: 'kg', alertSent: false,
   });
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -26,18 +27,51 @@ const InventoryManagement = () => {
     } catch (err) { console.error(err); }
   };
 
+  const resetForm = () => {
+    setForm({
+      ingredientName: '', quantityAvailable: '',
+      quantityUsed: '', minimumThreshold: '',
+      unit: 'kg', alertSent: false,
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      let savedItem;
       if (editItem) {
-        await api.put(`/api/inventory/${editItem.inventoryId}`, form);
+        const res = await api.put(
+          `/api/inventory/${editItem.inventoryId}`, form);
+        savedItem = res.data;
       } else {
-        await api.post('/api/inventory', form);
+        const res = await api.post('/api/inventory', form);
+        savedItem = res.data;
       }
+
+      // Auto low stock alert
+      if (
+        savedItem &&
+        parseFloat(savedItem.quantityAvailable) <=
+        parseFloat(savedItem.minimumThreshold)
+      ) {
+        try {
+          await api.post('/api/email/low-stock', {
+            to: 'manager@dinesync.com',
+            ingredientName: savedItem.ingredientName,
+            quantityLeft: parseFloat(savedItem.quantityAvailable),
+            unit: savedItem.unit,
+          });
+          alert(
+            `⚠️ Low stock alert sent for ${savedItem.ingredientName}!`
+          );
+        } catch (emailErr) {
+          console.error('Alert email failed:', emailErr);
+        }
+      }
+
       setShowForm(false);
       setEditItem(null);
-      setForm({ ingredientName: '', unit: '', quantityAvailable: '',
-        quantityUsed: '', minimumThreshold: '', alertSent: false });
+      resetForm();
       fetchInventory();
     } catch (err) { console.error(err); }
   };
@@ -49,14 +83,21 @@ const InventoryManagement = () => {
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Delete this item?')) {
+    if (window.confirm('Delete this inventory item?')) {
       await api.delete(`/api/inventory/${id}`);
       fetchInventory();
     }
   };
 
-  const isLowStock = (item) =>
-    parseFloat(item.quantityAvailable) <= parseFloat(item.minimumThreshold);
+  const lowStockItems = inventory.filter(
+    item => parseFloat(item.quantityAvailable) <=
+            parseFloat(item.minimumThreshold)
+  );
+
+  const unitColors = {
+    kg: '#3498db', liters: '#2ecc71',
+    pieces: '#f5a623', grams: '#9b59b6',
+  };
 
   return (
     <div style={styles.container}>
@@ -66,9 +107,11 @@ const InventoryManagement = () => {
           <span style={styles.logoText}>DineSync</span>
         </div>
         <div style={styles.backBtn} onClick={() => goToDashboard()}>
-          <FaArrowLeft /> <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
+          <FaArrowLeft />
+          <span style={{marginLeft:'8px'}}>Back to Dashboard</span>
         </div>
-        <div style={styles.logoutBtn} onClick={() => { logout(); navigate('/login'); }}>
+        <div style={styles.logoutBtn}
+          onClick={() => { logout(); navigate('/login', { replace: true }); }}>
           🚪 Logout
         </div>
       </div>
@@ -76,10 +119,12 @@ const InventoryManagement = () => {
       <div style={styles.main}>
         <div style={styles.header}>
           <div>
-            <h1 style={styles.title}>Inventory Management</h1>
+            <h1 style={styles.title}>📦 Inventory Management</h1>
             <p style={styles.subtitle}>
               {inventory.length} items •
-              <span style={{color:'#e74c3c'}}> {inventory.filter(isLowStock).length} low stock</span>
+              <span style={{color:'#e74c3c'}}>
+                {' '}{lowStockItems.length} low stock
+              </span>
             </p>
           </div>
           <button style={styles.addBtn} onClick={() => setShowForm(true)}>
@@ -87,6 +132,50 @@ const InventoryManagement = () => {
           </button>
         </div>
 
+        {/* Low Stock Alert Banner */}
+        {lowStockItems.length > 0 && (
+          <div style={styles.alertBanner}>
+            ⚠️ Low Stock Items:
+            {lowStockItems.map(item => (
+              <span key={item.inventoryId} style={styles.alertItem}>
+                {item.ingredientName} ({item.quantityAvailable} {item.unit})
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div style={styles.statsGrid}>
+          <div style={styles.statCard}>
+            <div style={styles.statIcon}>📦</div>
+            <div>
+              <div style={{...styles.statValue, color:'#3498db'}}>
+                {inventory.length}
+              </div>
+              <div style={styles.statLabel}>Total Items</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statIcon}>✅</div>
+            <div>
+              <div style={{...styles.statValue, color:'#2ecc71'}}>
+                {inventory.length - lowStockItems.length}
+              </div>
+              <div style={styles.statLabel}>In Stock</div>
+            </div>
+          </div>
+          <div style={styles.statCard}>
+            <div style={styles.statIcon}>⚠️</div>
+            <div>
+              <div style={{...styles.statValue, color:'#e74c3c'}}>
+                {lowStockItems.length}
+              </div>
+              <div style={styles.statLabel}>Low Stock</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Modal */}
         {showForm && (
           <div style={styles.modal}>
             <div style={styles.modalBox}>
@@ -97,35 +186,63 @@ const InventoryManagement = () => {
                 <div style={styles.formGrid}>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Ingredient Name</label>
-                    <input style={styles.input} value={form.ingredientName}
-                      onChange={e => setForm({...form, ingredientName: e.target.value})} required />
+                    <input style={styles.input}
+                      value={form.ingredientName}
+                      placeholder="e.g. Chicken"
+                      onChange={e => setForm({
+                        ...form, ingredientName: e.target.value
+                      })}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Unit</label>
-                    <input style={styles.input} value={form.unit} placeholder="kg, liters, pieces"
-                      onChange={e => setForm({...form, unit: e.target.value})} required />
+                    <select style={styles.input} value={form.unit}
+                      onChange={e => setForm({...form, unit: e.target.value})}>
+                      {['kg','liters','pieces','grams'].map(u =>
+                        <option key={u}>{u}</option>)}
+                    </select>
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Quantity Available</label>
-                    <input style={styles.input} type="number" step="0.01" value={form.quantityAvailable}
-                      onChange={e => setForm({...form, quantityAvailable: e.target.value})} required />
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.quantityAvailable}
+                      onChange={e => setForm({
+                        ...form, quantityAvailable: e.target.value
+                      })}
+                      required />
                   </div>
                   <div style={styles.formGroup}>
                     <label style={styles.label}>Quantity Used</label>
-                    <input style={styles.input} type="number" step="0.01" value={form.quantityUsed}
-                      onChange={e => setForm({...form, quantityUsed: e.target.value})} required />
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.quantityUsed}
+                      onChange={e => setForm({
+                        ...form, quantityUsed: e.target.value
+                      })} />
                   </div>
                   <div style={styles.formGroup}>
-                    <label style={styles.label}>Minimum Threshold</label>
-                    <input style={styles.input} type="number" step="0.01" value={form.minimumThreshold}
-                      onChange={e => setForm({...form, minimumThreshold: e.target.value})} required />
+                    <label style={styles.label}>
+                      Minimum Threshold
+                      <span style={styles.thresholdHint}>
+                        (alert sent below this)
+                      </span>
+                    </label>
+                    <input style={styles.input} type="number" step="0.01"
+                      value={form.minimumThreshold}
+                      onChange={e => setForm({
+                        ...form, minimumThreshold: e.target.value
+                      })}
+                      required />
                   </div>
                 </div>
                 <div style={styles.modalBtns}>
                   <button type="button" style={styles.cancelBtn}
-                    onClick={() => { setShowForm(false); setEditItem(null); }}>Cancel</button>
+                    onClick={() => {
+                      setShowForm(false);
+                      setEditItem(null);
+                      resetForm();
+                    }}>Cancel</button>
                   <button type="submit" style={styles.saveBtn}>
-                    {editItem ? 'Update' : 'Add Item'}
+                    {editItem ? 'Update Item' : 'Add Item'}
                   </button>
                 </div>
               </form>
@@ -133,6 +250,7 @@ const InventoryManagement = () => {
           </div>
         )}
 
+        {/* Inventory Table */}
         <div style={styles.tableBox}>
           <table style={styles.table}>
             <thead>
@@ -147,42 +265,61 @@ const InventoryManagement = () => {
               </tr>
             </thead>
             <tbody>
-              {inventory.map(item => (
-                <tr key={item.inventoryId}
-                  style={{...styles.tableRow,
-                    background: isLowStock(item) ? '#fff5f5' : 'white'}}>
-                  <td style={styles.td}>
-                    <strong>{item.ingredientName}</strong>
-                    {isLowStock(item) &&
-                      <FaExclamationTriangle style={{color:'#e74c3c', marginLeft:'8px'}} />}
-                  </td>
-                  <td style={styles.td}>{item.unit}</td>
-                  <td style={styles.td}>{item.quantityAvailable}</td>
-                  <td style={styles.td}>{item.quantityUsed}</td>
-                  <td style={styles.td}>{item.minimumThreshold}</td>
-                  <td style={styles.td}>
-                    <span style={{
-                      ...styles.badge,
-                      background: isLowStock(item) ? '#e74c3c' : '#2ecc71'
-                    }}>
-                      {isLowStock(item) ? 'LOW STOCK' : 'OK'}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    <button style={styles.editBtn} onClick={() => handleEdit(item)}>
-                      <FaEdit />
-                    </button>
-                    <button style={styles.deleteBtn}
-                      onClick={() => handleDelete(item.inventoryId)}>
-                      <FaTrash />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {inventory.map(item => {
+                const isLow = parseFloat(item.quantityAvailable) <=
+                              parseFloat(item.minimumThreshold);
+                return (
+                  <tr key={item.inventoryId} style={{
+                    ...styles.tableRow,
+                    background: isLow ? '#fff5f5' : 'white',
+                  }}>
+                    <td style={styles.td}>
+                      <strong>{item.ingredientName}</strong>
+                    </td>
+                    <td style={styles.td}>
+                      <span style={{
+                        ...styles.badge,
+                        background: unitColors[item.unit] || '#888'
+                      }}>
+                        {item.unit}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <strong style={{
+                        color: isLow ? '#e74c3c' : '#2ecc71'
+                      }}>
+                        {item.quantityAvailable}
+                      </strong>
+                    </td>
+                    <td style={styles.td}>{item.quantityUsed || 0}</td>
+                    <td style={styles.td}>{item.minimumThreshold}</td>
+                    <td style={styles.td}>
+                      <span style={{
+                        ...styles.badge,
+                        background: isLow ? '#e74c3c' : '#2ecc71'
+                      }}>
+                        {isLow ? '⚠️ LOW' : '✅ OK'}
+                      </span>
+                    </td>
+                    <td style={styles.td}>
+                      <button style={styles.editBtn}
+                        onClick={() => handleEdit(item)}>
+                        <FaEdit />
+                      </button>
+                      <button style={styles.deleteBtn}
+                        onClick={() => handleDelete(item.inventoryId)}>
+                        <FaTrash />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
               {inventory.length === 0 && (
                 <tr>
-                  <td colSpan="7" style={{...styles.td, textAlign:'center',
-                    color:'#888', padding:'40px'}}>
+                  <td colSpan="7" style={{
+                    ...styles.td, textAlign:'center',
+                    color:'#888', padding:'40px'
+                  }}>
                     No inventory items yet.
                   </td>
                 </tr>
@@ -225,18 +362,43 @@ const styles = {
     padding: '12px 20px', borderRadius: '8px', fontSize: '14px',
     fontWeight: '600', cursor: 'pointer',
   },
+  alertBanner: {
+    background: '#ffe0e0', border: '1px solid #e74c3c',
+    borderRadius: '10px', padding: '12px 20px',
+    marginBottom: '20px', fontSize: '14px', color: '#c0392b',
+    fontWeight: '600', display: 'flex', flexWrap: 'wrap', gap: '10px',
+    alignItems: 'center',
+  },
+  alertItem: {
+    background: '#e74c3c', color: 'white', padding: '3px 10px',
+    borderRadius: '20px', fontSize: '12px',
+  },
+  statsGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+    gap: '20px', marginBottom: '25px',
+  },
+  statCard: {
+    background: 'white', borderRadius: '12px', padding: '20px',
+    display: 'flex', alignItems: 'center', gap: '15px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+  },
+  statIcon: { fontSize: '32px' },
+  statValue: { fontSize: '28px', fontWeight: '800' },
+  statLabel: { color: '#888', fontSize: '13px' },
   modal: {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(0,0,0,0.5)', display: 'flex',
     alignItems: 'center', justifyContent: 'center', zIndex: 1000,
   },
   modalBox: {
-    background: 'white', borderRadius: '16px', padding: '30px', width: '550px',
+    background: 'white', borderRadius: '16px', padding: '30px',
+    width: '580px', maxHeight: '80vh', overflow: 'auto',
   },
   modalTitle: { fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: '#1a1a2e' },
   formGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' },
   formGroup: { display: 'flex', flexDirection: 'column' },
   label: { fontSize: '13px', fontWeight: '600', color: '#333', marginBottom: '6px' },
+  thresholdHint: { color: '#e74c3c', fontSize: '11px', marginLeft: '5px' },
   input: {
     padding: '10px 12px', border: '2px solid #e0e0e0',
     borderRadius: '8px', fontSize: '14px', outline: 'none',
