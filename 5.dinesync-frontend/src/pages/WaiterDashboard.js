@@ -65,22 +65,52 @@ const WaiterDashboard = () => {
 
   // ── CHECK IN ──
   const handleCheckIn = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
-      const now = new Date();
-      const timeStr = now.toTimeString().substring(0, 5);
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const timeStr = now.toTimeString().substring(0, 5);
 
-      const res = await api.post('/api/attendance', {
-        userId: user?.userId || 7,
-        fullName: user?.email?.split('@')[0] || 'Waiter',
-        role: 'WAITER',
-        date: today,
-        checkInTime: timeStr,
-        checkOutTime: null,
-        status: 'PRESENT',
-        leaveType: 'NONE',
-        remarks: 'Checked in from Waiter Dashboard',
-      });
+    // Check if already checked in today
+    const existing = await api.get(`/api/attendance/date/${today}`);
+    const alreadyIn = existing.data.find(
+      a => String(a.userId) === String(user?.userId)
+    );
+
+    if (alreadyIn) {
+      alert(`⚠️ You already checked in today at ${alreadyIn.checkInTime}. You can only check in once per day.`);
+      setCheckedIn(true);
+      setCheckInTime(alreadyIn.checkInTime);
+      setAttendanceIdLocal(alreadyIn.attendanceId);
+      sessionStorage.setItem('attendanceId', alreadyIn.attendanceId);
+      sessionStorage.setItem('checkInTime', alreadyIn.checkInTime);
+      return;
+    }
+
+    const res = await api.post('/api/attendance', {
+      userId: user?.userId || 7,
+      fullName: user?.email?.split('@')[0] || 'Waiter',
+      role: 'WAITER',
+      date: today,
+      checkInTime: timeStr,
+      checkOutTime: null,
+      status: 'PRESENT',
+      leaveType: 'NONE',
+      remarks: 'Checked in from Waiter Dashboard',
+    });
+
+    const attId = res.data.attendanceId;
+    setAttendanceIdLocal(attId);
+    setAttendanceId(attId);
+    sessionStorage.setItem('attendanceId', attId);
+    sessionStorage.setItem('checkInTime', timeStr);
+    setCheckInTime(timeStr);
+    setCheckedIn(true);
+    alert(`✅ Checked in at ${timeStr}. Have a great shift!`);
+  } catch (err) {
+    console.error(err);
+    alert('Check-in failed. Try again.');
+  }
+};
 
       const attId = res.data.attendanceId;
       setAttendanceIdLocal(attId);
