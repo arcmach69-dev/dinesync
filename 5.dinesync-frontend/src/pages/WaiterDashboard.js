@@ -29,6 +29,7 @@ const WaiterDashboard = () => {
   const [attendanceId, setAttendanceIdLocal] = useState(null);
   const [totalHours, setTotalHours] = useState(null);
   const [showCheckedOutMsg, setShowCheckedOutMsg] = useState(false);
+  const [clock, setClock] = useState(new Date().toLocaleTimeString());
 
   const { user, logout, setAttendanceId } = useAuth();
   const navigate = useNavigate();
@@ -37,6 +38,10 @@ const WaiterDashboard = () => {
   useEffect(() => {
     fetchAll();
     const interval = setInterval(fetchAll, 15000);
+
+    // Live clock
+    const clockInterval = setInterval(() =>
+      setClock(new Date().toLocaleTimeString()), 1000);
 
     // Restore check-in state if already checked in today
     const savedAttId = sessionStorage.getItem('attendanceId');
@@ -47,7 +52,10 @@ const WaiterDashboard = () => {
       setAttendanceIdLocal(savedAttId);
     }
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      clearInterval(clockInterval);
+    };
   }, []);
 
   const fetchAll = async () => {
@@ -65,56 +73,46 @@ const WaiterDashboard = () => {
 
   // ── CHECK IN ──
   const handleCheckIn = async () => {
-  try {
-    const today = new Date().toISOString().split('T')[0];
-    const now = new Date();
-    const timeStr = now.toTimeString().substring(0, 5);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const now = new Date();
+      const timeStr = now.toTimeString().substring(0, 5);
 
-    // Check if already checked in today
-    const existing = await api.get(`/api/attendance/date/${today}`);
-    const alreadyIn = existing.data.find(
-      a => String(a.userId) === String(user?.userId)
-    );
+      // Check if already checked in today
+      const existing = await api.get(`/api/attendance/date/${today}`);
+      const alreadyIn = existing.data.find(
+        a => String(a.userId) === String(user?.userId)
+      );
 
-    if (alreadyIn) {
-      alert(`⚠️ You already checked in today at ${alreadyIn.checkInTime}. You can only check in once per day.`);
-      setCheckedIn(true);
-      setCheckInTime(alreadyIn.checkInTime);
-      setAttendanceIdLocal(alreadyIn.attendanceId);
-      sessionStorage.setItem('attendanceId', alreadyIn.attendanceId);
-      sessionStorage.setItem('checkInTime', alreadyIn.checkInTime);
-      return;
-    }
+      if (alreadyIn) {
+        alert(
+          `⚠️ You already checked in today at ${alreadyIn.checkInTime}.` +
+          ` You can only check in once per day.`
+        );
+        setCheckedIn(true);
+        setCheckInTime(alreadyIn.checkInTime);
+        setAttendanceIdLocal(alreadyIn.attendanceId);
+        sessionStorage.setItem('attendanceId', alreadyIn.attendanceId);
+        sessionStorage.setItem('checkInTime', alreadyIn.checkInTime);
+        return;
+      }
 
-    const res = await api.post('/api/attendance', {
-      userId: user?.userId || 7,
-      fullName: user?.email?.split('@')[0] || 'Waiter',
-      role: 'WAITER',
-      date: today,
-      checkInTime: timeStr,
-      checkOutTime: null,
-      status: 'PRESENT',
-      leaveType: 'NONE',
-      remarks: 'Checked in from Waiter Dashboard',
-    });
-
-    const attId = res.data.attendanceId;
-    setAttendanceIdLocal(attId);
-    setAttendanceId(attId);
-    sessionStorage.setItem('attendanceId', attId);
-    sessionStorage.setItem('checkInTime', timeStr);
-    setCheckInTime(timeStr);
-    setCheckedIn(true);
-    alert(`✅ Checked in at ${timeStr}. Have a great shift!`);
-  } catch (err) {
-    console.error(err);
-    alert('Check-in failed. Try again.');
-  }
-};
+      const res = await api.post('/api/attendance', {
+        userId: user?.userId || 7,
+        fullName: user?.email?.split('@')[0] || 'Waiter',
+        role: 'WAITER',
+        date: today,
+        checkInTime: timeStr,
+        checkOutTime: null,
+        status: 'PRESENT',
+        leaveType: 'NONE',
+        remarks: 'Checked in from Waiter Dashboard',
+      });
 
       const attId = res.data.attendanceId;
       setAttendanceIdLocal(attId);
       setAttendanceId(attId);
+      sessionStorage.setItem('attendanceId', attId);
       sessionStorage.setItem('checkInTime', timeStr);
       setCheckInTime(timeStr);
       setCheckedIn(true);
@@ -135,7 +133,7 @@ const WaiterDashboard = () => {
       const now = new Date();
       const checkOutTime = now.toTimeString().substring(0, 5);
 
-      // Calculate hours
+      // Calculate hours worked
       const [inH, inM] = checkInTime.split(':').map(Number);
       const [outH, outM] = checkOutTime.split(':').map(Number);
       const totalMins = (outH * 60 + outM) - (inH * 60 + inM);
@@ -156,7 +154,6 @@ const WaiterDashboard = () => {
       setShowCheckedOutMsg(true);
       sessionStorage.removeItem('checkInTime');
       sessionStorage.removeItem('attendanceId');
-
       setTimeout(() => setShowCheckedOutMsg(false), 5000);
     } catch (err) {
       console.error(err);
@@ -167,49 +164,27 @@ const WaiterDashboard = () => {
   // ── NOTIFY CUSTOMER WHEN ORDER READY ──
   const notifyCustomerOrderReady = async (order) => {
     try {
-      // Send email if phone/email available
-      if (order.customerName) {
-        // Send SMS if phone available
-        if (order.customerPhone) {
-          await api.post('/api/sms/order-ready', {
-            to: order.customerPhone,
-            orderId: order.orderId,
-            customerName: order.customerName,
-          }).catch(() => {}); // Don't block if SMS fails
-        }
-
-        // Send email notification
-        await api.post('/api/email/order-ready', {
-          to: user?.email, // Send to restaurant email as backup
+      if (order.customerPhone) {
+        await api.post('/api/sms/order-ready', {
+          to: order.customerPhone,
           orderId: order.orderId,
-          customerName: order.customerName,
-          orderType: order.orderType,
-          amount: order.totalAmount,
-        }).catch(() => {}); // Don't block if email fails
+          customerName: order.customerName || 'Customer',
+        }).catch(() => {});
       }
+      await api.post('/api/email/order-ready', {
+        to: user?.email,
+        orderId: order.orderId,
+        customerName: order.customerName || 'Customer',
+        orderType: order.orderType,
+        amount: order.totalAmount,
+      }).catch(() => {});
+      alert(`✅ Customer notified! SMS and email sent for Order #${order.orderId}`);
     } catch (err) {
       console.error('Notification failed:', err);
     }
   };
 
-  const handleDispatch = async (order) => {
-    try {
-      await api.put(`/api/orders/${order.orderId}`, {
-        ...order, orderStatus: 'DELIVERED'
-      });
-      if (order.tableId) {
-        const table = tables.find(t => t.tableId === order.tableId);
-        if (table) {
-          await api.put(`/api/tables/${table.tableId}`, {
-            ...table, status: 'AVAILABLE', currentOrderId: null,
-          });
-        }
-      }
-      fetchAll();
-      alert(`Order #${order.orderId} marked as DELIVERED!`);
-    } catch (err) { console.error(err); }
-  };
-
+  // ── PLACE ORDER ──
   const handlePlaceOrder = async () => {
     if (selectedItems.length === 0) {
       alert('Please select at least one item');
@@ -238,7 +213,7 @@ const WaiterDashboard = () => {
         notes: notes || null,
       });
 
-      // Send order confirmation SMS/email to customer
+      // Send SMS confirmation to customer
       if (customerPhone) {
         await api.post('/api/sms/order-confirmation', {
           to: customerPhone,
@@ -250,10 +225,12 @@ const WaiterDashboard = () => {
 
       if (selectedTable) {
         await api.put(`/api/tables/${selectedTable.tableId}`, {
-          ...selectedTable, status: 'OCCUPIED',
+          ...selectedTable,
+          status: 'OCCUPIED',
           currentOrderId: orderRes.data.orderId,
         });
       }
+
       setShowOrderForm(false);
       setSelectedTable(null);
       setSelectedItems([]);
@@ -261,10 +238,11 @@ const WaiterDashboard = () => {
       setCustomerPhone('');
       setNotes('');
       fetchAll();
-      alert(`✅ Order #${orderRes.data.orderId} placed! SMS sent to customer.`);
+      alert(`✅ Order #${orderRes.data.orderId} placed successfully!`);
     } catch (err) { console.error(err); }
   };
 
+  // ── EDIT ORDER ──
   const handleEditOrder = async () => {
     try {
       await api.put(`/api/orders/${editOrder.orderId}`, {
@@ -273,7 +251,26 @@ const WaiterDashboard = () => {
       setShowEditForm(false);
       setEditOrder(null);
       fetchAll();
-      alert('Order updated!');
+      alert('Order updated successfully!');
+    } catch (err) { console.error(err); }
+  };
+
+  // ── DISPATCH ──
+  const handleDispatch = async (order) => {
+    try {
+      await api.put(`/api/orders/${order.orderId}`, {
+        ...order, orderStatus: 'DELIVERED'
+      });
+      if (order.tableId) {
+        const table = tables.find(t => t.tableId === order.tableId);
+        if (table) {
+          await api.put(`/api/tables/${table.tableId}`, {
+            ...table, status: 'AVAILABLE', currentOrderId: null,
+          });
+        }
+      }
+      fetchAll();
+      alert(`Order #${order.orderId} marked as DELIVERED!`);
     } catch (err) { console.error(err); }
   };
 
@@ -292,6 +289,14 @@ const WaiterDashboard = () => {
     setSelectedItems(selectedItems.filter(i => i.itemId !== itemId));
   };
 
+  const formatPhone = (value) => {
+    const input = value.replace(/\D/g, '');
+    if (!input) return '';
+    if (input.length <= 3) return `(${input}`;
+    if (input.length <= 6) return `(${input.slice(0,3)}) ${input.slice(3)}`;
+    return `(${input.slice(0,3)}) ${input.slice(3,6)}-${input.slice(6,10)}`;
+  };
+
   const totalAmount = selectedItems.reduce(
     (sum, item) => sum + (parseFloat(item.price) * item.qty), 0
   );
@@ -303,26 +308,13 @@ const WaiterDashboard = () => {
     RECEIVED: '#3498db', PREPARING: '#f5a623',
     READY: '#2ecc71', DELIVERED: '#9b59b6', CANCELLED: '#e74c3c',
   };
+
   const activeOrders = orders.filter(o => o.orderStatus !== 'CANCELLED');
-
-  const formatPhone = (value) => {
-    const input = value.replace(/\D/g, '');
-    if (!input) return '';
-    if (input.length <= 3) return `(${input}`;
-    if (input.length <= 6) return `(${input.slice(0,3)}) ${input.slice(3)}`;
-    return `(${input.slice(0,3)}) ${input.slice(3,6)}-${input.slice(6,10)}`;
-  };
-
-  // Live clock
-  const [clock, setClock] = useState(new Date().toLocaleTimeString());
-  useEffect(() => {
-    const t = setInterval(() =>
-      setClock(new Date().toLocaleTimeString()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   return (
     <div style={styles.container}>
+
+      {/* ── SIDEBAR ── */}
       <div style={styles.sidebar}>
         <div style={styles.logo}>
           <span>🍽️</span>
@@ -340,10 +332,9 @@ const WaiterDashboard = () => {
           </div>
         </div>
 
-        {/* ── ATTENDANCE CHECK IN/OUT WIDGET ── */}
+        {/* ── ATTENDANCE WIDGET ── */}
         <div style={styles.attendanceWidget}>
           <div style={styles.clockDisplay}>{clock}</div>
-
           {!checkedIn ? (
             <button style={styles.checkInBtn} onClick={handleCheckIn}>
               <FaClock /> Check In
@@ -352,17 +343,16 @@ const WaiterDashboard = () => {
             <div>
               <div style={styles.checkedInInfo}>
                 <FaCheckCircle style={{color:'#2ecc71'}} />
-                <span>Checked in at {checkInTime}</span>
+                <span>In since {checkInTime}</span>
               </div>
               <button style={styles.checkOutBtn} onClick={handleCheckOut}>
                 🚪 Check Out
               </button>
             </div>
           )}
-
           {showCheckedOutMsg && (
             <div style={styles.hoursMsg}>
-              ✅ Checked out! Total: {totalHours}
+              ✅ Done! Total: {totalHours}
             </div>
           )}
         </div>
@@ -391,6 +381,7 @@ const WaiterDashboard = () => {
         </div>
       </div>
 
+      {/* ── MAIN ── */}
       <div style={styles.main}>
         <div style={styles.header}>
           <h1 style={styles.title}>
@@ -407,12 +398,12 @@ const WaiterDashboard = () => {
             </span>
             <span style={{...styles.statBadge, background:'#3498db'}}>
               {activeOrders.filter(o =>
-                o.orderStatus !== 'DELIVERED').length} Active
+                o.orderStatus !== 'DELIVERED').length} Active Orders
             </span>
           </div>
         </div>
 
-        {/* TABLES TAB */}
+        {/* ── TABLES TAB ── */}
         {activeTab === 'tables' && (
           <div>
             <div style={styles.tablesGrid}>
@@ -442,9 +433,7 @@ const WaiterDashboard = () => {
                     {table.status}
                   </span>
                   {table.status === 'AVAILABLE' && (
-                    <div style={styles.clickHint}>
-                      Click to place order
-                    </div>
+                    <div style={styles.clickHint}>Click to place order</div>
                   )}
                 </div>
               ))}
@@ -459,7 +448,7 @@ const WaiterDashboard = () => {
           </div>
         )}
 
-        {/* ORDERS TAB */}
+        {/* ── ORDERS TAB ── */}
         {activeTab === 'orders' && (
           <div style={styles.ordersGrid}>
             {activeOrders.map(order => (
@@ -494,7 +483,7 @@ const WaiterDashboard = () => {
                   </div>
                 )}
 
-                {/* Edit — only RECEIVED */}
+                {/* Edit — RECEIVED only */}
                 {order.orderStatus === 'RECEIVED' && (
                   <button style={styles.editBtn}
                     onClick={() => {
@@ -511,7 +500,10 @@ const WaiterDashboard = () => {
                     <div style={styles.readyAlert}>
                       ✅ Ready to serve!
                     </div>
-                    
+                    <button style={styles.notifyBtn}
+                      onClick={() => notifyCustomerOrderReady(order)}>
+                      📱 Notify Customer (SMS + Email)
+                    </button>
                     <button style={styles.dispatchBtn}
                       onClick={() => handleDispatch(order)}>
                       🚀 Dispatch / Mark Delivered
@@ -522,8 +514,7 @@ const WaiterDashboard = () => {
                 {/* Bill */}
                 {order.orderStatus === 'DELIVERED' && (
                   <button style={styles.billBtn}
-                    onClick={() =>
-                      navigate(`/invoice/${order.orderId}`)}>
+                    onClick={() => navigate(`/invoice/${order.orderId}`)}>
                     🧾 Generate Bill
                   </button>
                 )}
@@ -535,7 +526,7 @@ const WaiterDashboard = () => {
           </div>
         )}
 
-        {/* MENU TAB */}
+        {/* ── MENU TAB ── */}
         {activeTab === 'menu' && (
           <div style={styles.menuGrid}>
             {menuItems.map(item => (
@@ -553,14 +544,14 @@ const WaiterDashboard = () => {
           </div>
         )}
 
-        {/* PLACE ORDER MODAL */}
+        {/* ── PLACE ORDER MODAL ── */}
         {showOrderForm && (
           <div style={styles.modal}>
             <div style={styles.modalBox}>
               <h2 style={styles.modalTitle}>
                 {selectedTable
                   ? `Place Order — Table ${selectedTable.tableNumber}`
-                  : 'New Order'}
+                  : 'New Takeaway / Online Order'}
               </h2>
               <div style={styles.formRow}>
                 <label style={styles.label}>Order Type:</label>
@@ -572,7 +563,8 @@ const WaiterDashboard = () => {
               </div>
               <div style={styles.formRow}>
                 <label style={styles.label}>Customer Name:</label>
-                <input style={styles.select} placeholder="Optional"
+                <input style={styles.select}
+                  placeholder="Optional"
                   value={customerName}
                   onChange={e => setCustomerName(e.target.value)} />
               </div>
@@ -580,7 +572,8 @@ const WaiterDashboard = () => {
                 <label style={styles.label}>Phone Number:</label>
                 <input style={styles.select}
                   placeholder="(555) 123-4567"
-                  value={customerPhone} maxLength={14}
+                  value={customerPhone}
+                  maxLength={14}
                   onChange={e =>
                     setCustomerPhone(formatPhone(e.target.value))} />
               </div>
@@ -595,12 +588,15 @@ const WaiterDashboard = () => {
               <h3 style={styles.sectionLabel}>Select Items:</h3>
               <div style={styles.menuSelectGrid}>
                 {menuItems.map(item => (
-                  <div key={item.itemId} style={styles.menuSelectItem}
+                  <div key={item.itemId}
+                    style={styles.menuSelectItem}
                     onClick={() => addItem(item)}>
                     {item.imageUrl && (
                       <img src={item.imageUrl} alt={item.dishName}
                         style={styles.menuSelectImg}
-                        onError={e => { e.target.style.display='none'; }} />
+                        onError={e => {
+                          e.target.style.display = 'none';
+                        }} />
                     )}
                     <div style={styles.menuSelectName}>
                       {item.dishName}
@@ -615,7 +611,7 @@ const WaiterDashboard = () => {
 
               {selectedItems.length > 0 && (
                 <div style={styles.selectedItems}>
-                  <h3 style={styles.sectionLabel}>Selected:</h3>
+                  <h3 style={styles.sectionLabel}>Selected Items:</h3>
                   {selectedItems.map(item => (
                     <div key={item.itemId} style={styles.selectedItem}>
                       <span>{item.dishName} x{item.qty}</span>
@@ -623,7 +619,8 @@ const WaiterDashboard = () => {
                         ${(parseFloat(item.price)*item.qty).toFixed(2)}
                       </span>
                       <button style={styles.removeBtn}
-                        onClick={() => removeItem(item.itemId)}>✕
+                        onClick={() => removeItem(item.itemId)}>
+                        ✕
                       </button>
                     </div>
                   ))}
@@ -652,7 +649,7 @@ const WaiterDashboard = () => {
           </div>
         )}
 
-        {/* EDIT ORDER MODAL */}
+        {/* ── EDIT ORDER MODAL ── */}
         {showEditForm && editOrder && (
           <div style={styles.modal}>
             <div style={styles.modalBox}>
@@ -689,9 +686,10 @@ const WaiterDashboard = () => {
                   })} />
               </div>
               <div style={styles.formRow}>
-                <label style={styles.label}>Notes:</label>
+                <label style={styles.label}>Special Notes:</label>
                 <input style={styles.select}
                   value={editOrder.notes || ''}
+                  placeholder="No onions, extra spicy..."
                   onChange={e => setEditOrder({
                     ...editOrder, notes: e.target.value
                   })} />
@@ -722,8 +720,8 @@ const styles = {
   },
   sidebar: {
     width: '260px', background: '#1a1a2e', color: 'white',
-    display: 'flex', flexDirection: 'column', padding: '20px 0',
-    overflowY: 'auto',
+    display: 'flex', flexDirection: 'column',
+    padding: '20px 0', overflowY: 'auto',
   },
   logo: {
     display: 'flex', alignItems: 'center',
@@ -738,44 +736,43 @@ const styles = {
   userAvatar: { fontSize: '24px' },
   userName: { fontSize: '13px', color: 'white', fontWeight: '600' },
   userRole: { fontSize: '11px', color: '#f5a623', fontWeight: '600' },
-
-  // ── ATTENDANCE WIDGET ──
   attendanceWidget: {
     background: 'rgba(255,255,255,0.05)',
     margin: '0 10px 15px', borderRadius: '12px', padding: '15px',
     border: '1px solid rgba(255,255,255,0.08)',
   },
   clockDisplay: {
-    fontSize: '20px', fontWeight: '800', color: '#f5a623',
+    fontSize: '18px', fontWeight: '800', color: '#f5a623',
     textAlign: 'center', marginBottom: '12px', letterSpacing: '1px',
   },
   checkInBtn: {
     width: '100%', padding: '10px', background: '#2ecc71',
     color: 'white', border: 'none', borderRadius: '8px',
-    cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+    cursor: 'pointer', fontWeight: '700', fontSize: '13px',
     display: 'flex', alignItems: 'center',
     justifyContent: 'center', gap: '8px',
   },
   checkedInInfo: {
-    display: 'flex', alignItems: 'center', gap: '8px',
-    fontSize: '12px', color: '#2ecc71', marginBottom: '10px',
+    display: 'flex', alignItems: 'center', gap: '6px',
+    fontSize: '12px', color: '#2ecc71', marginBottom: '8px',
     justifyContent: 'center', fontWeight: '600',
   },
   checkOutBtn: {
     width: '100%', padding: '10px', background: '#e74c3c',
     color: 'white', border: 'none', borderRadius: '8px',
-    cursor: 'pointer', fontWeight: '700', fontSize: '14px',
+    cursor: 'pointer', fontWeight: '700', fontSize: '13px',
   },
   hoursMsg: {
-    marginTop: '8px', padding: '8px', background: 'rgba(46,204,113,0.15)',
-    borderRadius: '6px', fontSize: '12px', color: '#2ecc71',
+    marginTop: '8px', padding: '8px',
+    background: 'rgba(46,204,113,0.15)', borderRadius: '6px',
+    fontSize: '12px', color: '#2ecc71',
     textAlign: 'center', fontWeight: '600',
   },
-
   nav: { flex: 1, padding: '5px 0' },
   navItem: {
     display: 'flex', alignItems: 'center', gap: '12px',
-    padding: '12px 20px', cursor: 'pointer', color: '#aaa', fontSize: '14px',
+    padding: '12px 20px', cursor: 'pointer',
+    color: '#aaa', fontSize: '14px',
   },
   navItemActive: {
     display: 'flex', alignItems: 'center', gap: '12px',
@@ -793,8 +790,9 @@ const styles = {
     overflow: 'auto', padding: '30px',
   },
   header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    background: 'white', padding: '20px 30px', borderRadius: '12px',
+    display: 'flex', justifyContent: 'space-between',
+    alignItems: 'center', background: 'white',
+    padding: '20px 30px', borderRadius: '12px',
     marginBottom: '25px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
   },
   title: {
@@ -819,15 +817,17 @@ const styles = {
   },
   tableInfo: { fontSize: '13px', color: '#888', marginBottom: '4px' },
   statusBadge: {
-    display: 'inline-block', padding: '4px 12px', borderRadius: '20px',
-    color: 'white', fontSize: '12px', fontWeight: '600', margin: '10px 0',
+    display: 'inline-block', padding: '4px 12px',
+    borderRadius: '20px', color: 'white',
+    fontSize: '12px', fontWeight: '600', margin: '10px 0',
   },
   clickHint: { fontSize: '12px', color: '#f5a623', marginTop: '5px' },
   newOrderBtn: {
     display: 'flex', alignItems: 'center', gap: '8px',
     background: '#f5a623', color: 'white', border: 'none',
-    padding: '12px 20px', borderRadius: '8px', fontSize: '14px',
-    fontWeight: '600', cursor: 'pointer', marginTop: '10px',
+    padding: '12px 20px', borderRadius: '8px',
+    fontSize: '14px', fontWeight: '600', cursor: 'pointer',
+    marginTop: '10px',
   },
   ordersGrid: {
     display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px',
@@ -890,13 +890,13 @@ const styles = {
     display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px',
   },
   menuCard: {
-    background: 'white', borderRadius: '12px',
-    padding: '15px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
+    background: 'white', borderRadius: '12px', padding: '15px',
+    boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
     textAlign: 'center', overflow: 'hidden',
   },
   menuImg: {
-    width: '100%', height: '120px', objectFit: 'cover',
-    borderRadius: '8px', marginBottom: '10px',
+    width: '100%', height: '120px',
+    objectFit: 'cover', borderRadius: '8px', marginBottom: '10px',
   },
   menuName: {
     fontSize: '14px', fontWeight: '700',
@@ -905,9 +905,7 @@ const styles = {
   menuCategory: {
     fontSize: '11px', color: '#f5a623', marginBottom: '4px',
   },
-  menuPrice: {
-    fontSize: '16px', fontWeight: '800', color: '#2ecc71',
-  },
+  menuPrice: { fontSize: '16px', fontWeight: '800', color: '#2ecc71' },
   modal: {
     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
     background: 'rgba(0,0,0,0.6)', display: 'flex',
@@ -943,12 +941,12 @@ const styles = {
   },
   menuSelectItem: {
     border: '2px solid #e0e0e0', borderRadius: '10px',
-    padding: '10px', cursor: 'pointer', textAlign: 'center',
-    overflow: 'hidden',
+    padding: '10px', cursor: 'pointer',
+    textAlign: 'center', overflow: 'hidden',
   },
   menuSelectImg: {
-    width: '100%', height: '70px', objectFit: 'cover',
-    borderRadius: '6px', marginBottom: '6px',
+    width: '100%', height: '70px',
+    objectFit: 'cover', borderRadius: '6px', marginBottom: '6px',
   },
   menuSelectName: {
     fontSize: '12px', fontWeight: '600',
